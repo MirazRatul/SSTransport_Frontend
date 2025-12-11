@@ -3,5 +3,5 @@ export const AppColors = {
     secondaryColor: "#FFCC00",
     textColor: "#fff",
     cardColor: "#1E2226",
-    inputColor: "#222831"
+    inputColor: "#222831",
 }

@@ -1,37 +1,57 @@
-import { StyleSheet, Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native'
-import React from 'react'
-import { AppColors } from '../styles/colors'
+import {
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  ViewStyle,
+  TextStyle,
+  StyleProp,
+} from 'react-native';
+import React, { Activity } from 'react';
+import { AppColors } from '../styles/colors';
+import { scale as s, vs } from 'react-native-size-matters';
+import AppText from './AppText';
 
 interface AppButtonProps {
   title: string;
   onPress: () => void;
-  btnStyle?: ViewStyle;
-  textStyle?: TextStyle;
+  btnStyle?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   isLoading?: boolean;
 }
 
-const AppButton = ({title, onPress, btnStyle, textStyle, isLoading}: AppButtonProps) => {
+const AppButton = ({
+  title,
+  onPress,
+  btnStyle,
+  textStyle,
+  isLoading,
+}: AppButtonProps) => {
   return (
-    <TouchableOpacity style={styles.btnContainer} onPress={onPress}>
-        {isLoading ? (<Text>Signin...</Text>): (<Text style={styles.btnText}>{title}</Text>)}
+    <TouchableOpacity style={[styles.btnContainer, btnStyle]} onPress={onPress}>
+      {isLoading ? (
+        <ActivityIndicator size="small" color={AppColors.textColor} />
+      ) : (
+        <AppText variant='bold' style={[styles.btnText, textStyle]}>{title}</AppText>
+      )}
     </TouchableOpacity>
-  )
-}
+  );
+};
 
-export default AppButton
+export default AppButton;
 
 const styles = StyleSheet.create({
   btnContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: AppColors.secondaryColor,
-    height: 48,
-    width: 326,
-    paddingHorizontal: 16,
-    borderRadius: 6,
+    height: s(48),
+    width: s(326),
+    paddingHorizontal: s(16),
+    borderRadius: s(6),
   },
   btnText: {
     color: AppColors.textColor,
-    fontSize: 18,
-  }
-})
+    fontSize: s(18),
+  },
+});

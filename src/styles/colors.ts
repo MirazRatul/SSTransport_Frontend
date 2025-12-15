@@ -4,4 +4,5 @@ export const AppColors = {
     textColor: "#fff",
     cardColor: "#1E2226",
     inputColor: "#222831",
+    tripBackground: "#212021"
 }

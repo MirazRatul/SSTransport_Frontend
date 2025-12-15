@@ -5,7 +5,7 @@ import {
   LayoutDashboard,
   Truck,
   IdCardLanyard,
-  User
+  User,
 } from 'lucide-react-native';
 import { AppColors } from '../styles/colors';
 import EmployeeList from '../screens/employee/EmployeeList';
@@ -43,7 +43,9 @@ const BottomTab = () => {
       />
       <Tab.Screen
         options={{
-          tabBarIcon: ({ color }) => <IdCardLanyard size={s(20)} color={color} />,
+          tabBarIcon: ({ color }) => (
+            <IdCardLanyard size={s(20)} color={color} />
+          ),
           title: 'Employee',
         }}
         name="EmployeeList"

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "356519663848",
+    "project_id": "sstransport-53a72",
+    "storage_bucket": "sstransport-53a72.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:356519663848:android:1d3ee5c72a4d2fa22a115d",
+        "android_client_info": {
+          "package_name": "com.sstransport"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "356519663848-3bkht37vti715ns6jtosjtljllguk0r4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDmEkjGICh4qR8nrMjab-XZlOSmlzmfRHY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "356519663848-3bkht37vti715ns6jtosjtljllguk0r4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

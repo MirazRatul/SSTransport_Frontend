@@ -13,13 +13,9 @@ interface AppHeaderProps {
 const AppHeader: React.FC<AppHeaderProps> = ({ title }) => {
   return (
     <SafeAreaView style={styles.headerContainer}>
-      <TouchableOpacity style={styles.backBtn}>
-        <ArrowLeft size={24} color={AppColors.textColor} />
-      </TouchableOpacity>
       <View style={styles.textContainer}>
-        <AppText style={{color: AppColors.textColor}} variant="bold">{title}</AppText>
+        <AppText style={{color: AppColors.textColor, fontSize: s(18)}} variant="bold">{title}</AppText>
       </View>
-      
     </SafeAreaView>
   );
 };
@@ -34,18 +30,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: s(10),
-    paddingTop: vs(20),
-    paddingBottom: vs(15),
+    paddingHorizontal: s(20),
+    paddingTop: s(20),
+    paddingBottom: s(30),
     borderWidth: .3,
     borderBottomColor: AppColors.textColor
-  },
-  backBtn: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: s(30),
-    width: s(30),
-    borderRadius: s(15),
   },
   textContainer: {
     flex: 1,
@@ -53,6 +42,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
-    marginRight: s(30),
   },
 });

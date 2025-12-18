@@ -1,15 +1,20 @@
-import { Alert, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet } from 'react-native';
+import './src/config/GoogleSignIn';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import MainStack from './src/navigation/MainStack';
+import { Provider } from 'react-redux';
+import store from './src/store/store';
 
 function App() {
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <MainStack />
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <Provider store={store}>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <MainStack />
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </Provider>
   );
 }
 

@@ -1,4 +1,11 @@
-import { StyleSheet, Text, View } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Platform,
+} from 'react-native';
 import React, { useState } from 'react';
 import AppButton from '../../components/AppButton';
 import { scale as s, vs } from 'react-native-size-matters';
@@ -12,47 +19,66 @@ const CommonAuth = () => {
   const [activeTab, setActiveTab] = useState('login');
   return (
     <SafeAreaView style={container}>
-      <View style={styles.loginContainer}>
-        <View style={styles.btnContainer}>
-          <AppButton
-            btnStyle={[
-              styles.btn,
-              {
-                backgroundColor:
-                  activeTab === 'login'
-                    ? AppColors.secondaryColor
-                    : '#383838',
-              },
-            ]}
-            textStyle={[styles.btnText, {color: activeTab === 'login' ? AppColors.primaryColor : AppColors.textColor}]}
-            title="Login"
-            onPress={() => setActiveTab('login')}
-          />
-          <AppButton
-            btnStyle={[
-              styles.btn,
-              {
-                backgroundColor:
-                  activeTab === 'signup'
-                    ? AppColors.secondaryColor
-                    : '#383838',
-              },
-            ]}
-            textStyle={[
-              styles.btnText,
-              {
-                color:
-                  activeTab === 'signup'
-                    ? AppColors.primaryColor
-                    : AppColors.textColor,
-              },
-            ]}
-            title="SignUp"
-            onPress={() => setActiveTab('signup')}
-          />
-        </View>
-        {activeTab === 'login' ? <SignIn /> : <SignUp /> }
-      </View>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={styles.loginContainer}>
+            <View style={styles.btnContainer}>
+              <AppButton
+                btnStyle={[
+                  styles.btn,
+                  {
+                    backgroundColor:
+                      activeTab === 'login'
+                        ? AppColors.secondaryColor
+                        : '#383838',
+                  },
+                ]}
+                textStyle={[
+                  styles.btnText,
+                  {
+                    color:
+                      activeTab === 'login'
+                        ? AppColors.primaryColor
+                        : AppColors.textColor,
+                  },
+                ]}
+                title="Login"
+                onPress={() => setActiveTab('login')}
+              />
+              <AppButton
+                btnStyle={[
+                  styles.btn,
+                  {
+                    backgroundColor:
+                      activeTab === 'signup'
+                        ? AppColors.secondaryColor
+                        : '#383838',
+                  },
+                ]}
+                textStyle={[
+                  styles.btnText,
+                  {
+                    color:
+                      activeTab === 'signup'
+                        ? AppColors.primaryColor
+                        : AppColors.textColor,
+                  },
+                ]}
+                title="SignUp"
+                onPress={() => setActiveTab('signup')}
+              />
+            </View>
+            {activeTab === 'login' ? (
+              <SignIn onGoToSignUp={() => setActiveTab('signup')} />
+            ) : (
+              <SignUp onGoToSignIn={() => setActiveTab('login')} />
+            )}
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -71,7 +97,7 @@ const styles = StyleSheet.create({
     width: '90%',
     padding: s(3),
     alignItems: 'center',
-    backgroundColor: "#383838",
+    backgroundColor: '#383838',
     borderRadius: s(5),
     marginBottom: vs(20),
   },

@@ -1,13 +1,30 @@
 import { StyleSheet, Text, View, FlatList } from 'react-native';
-import React from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect } from 'react';
 import AppText from '../../components/AppText';
 import { container } from '../../constants/container';
 import AppHeader from '../../components/AppHeader';
 import TripCard from '../../components/TripCard';
 import { scale as s } from 'react-native-size-matters';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DashBoard = () => {
+  const fetchUserInfo = async () => {
+    const userData = await AsyncStorage.getItem('userData');
+    if (userData) {
+      try {
+        const parsed = JSON.parse(userData);
+        console.log('User Data: ', parsed.email);
+      } catch (e) {
+        console.log('User Data (raw): ', userData);
+      }
+    } else {
+      console.log('User Data: null');
+    }
+  };
+  useEffect(() => {
+    fetchUserInfo();
+  }, []);
+
   const tripsData = [
     {
       vehicleId: 'NYB-8092',

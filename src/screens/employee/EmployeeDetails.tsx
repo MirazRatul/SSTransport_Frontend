@@ -1,59 +1,51 @@
 import {
   Image,
-  Modal,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import React from 'react';
 import { AppColors } from '../../styles/colors';
 import { scale as s, vs } from 'react-native-size-matters';
 import AppText from '../../components/AppText';
-import { X } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { container } from '../../constants/container';
+import BackButton from '../../components/BackButton';
 
-interface EmployeeDetailsProps {
-  modalVisible: boolean;
-  imageURI: string;
-  name: string;
-  title: string;
-  onClose: () => void;
-}
-
-const EmployeeDetails: React.FC<EmployeeDetailsProps> = ({
-  modalVisible,
-  imageURI,
-  name,
-  title,
-  onClose,
-}) => {
+const EmployeeDetails = ({ route }: any) => {
+  const { selectedEmployee } = route.params;
   return (
-    <Modal animationType="slide" visible={modalVisible} transparent>
-      <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          <Image source={{ uri: imageURI }} style={styles.image} />
-          <AppText variant="bold">{name}</AppText>
-          <AppText>{title}</AppText>
-
-          <TouchableOpacity style={styles.close} onPress={onClose}>
-            <X size={20} color={AppColors.textColor}/>
-          </TouchableOpacity>
+    <SafeAreaView style={container}>
+      {selectedEmployee && (
+        <View style={styles.detailsContainer}>
+          <BackButton />
+          <Image
+            source={{ uri: selectedEmployee.imageURI }}
+            style={styles.image}
+          />
+          <AppText variant="bold">{selectedEmployee.name}</AppText>
+          <AppText>{selectedEmployee.title}</AppText>
+          <Image
+            source={{
+              uri: 'https://imgv2-2-f.scribdassets.com/img/document/658369602/original/a9e0b3a4b2/1?v=1',
+            }}
+            style={styles.nidImage}
+          />
         </View>
-      </View>
-    </Modal>
+      )}
+    </SafeAreaView>
   );
 };
 
 export default EmployeeDetails;
 
 const styles = StyleSheet.create({
-  overlay: {
+  detailsContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: s(20),
-    elevation: 5
+    padding: s(10),
+    backgroundColor: AppColors.cardColor,
+    borderRadius: s(10),
   },
   image: {
     height: s(80),
@@ -61,25 +53,12 @@ const styles = StyleSheet.create({
     borderRadius: s(40),
     marginBottom: vs(10),
   },
-  modalContainer: {
-    width: '100%',
-    backgroundColor: AppColors.primaryColor,
-    borderWidth: 1,
+  nidImage: {
+    marginVertical: vs(10),
+    height: s(200),
+    width: s(300),
+    resizeMode: 'contain',
+    overflow: 'hidden',
     borderRadius: s(10),
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: vs(20),
   },
-  close: {
-    height: s(30),
-    width: s(30),
-    position: 'absolute',
-    borderWidth: 1,
-    borderRadius: s(15),
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: s(5),
-    top: s(10),
-    right: s(10)
-  }
 });

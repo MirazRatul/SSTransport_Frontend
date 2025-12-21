@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, FlatList } from 'react-native';
+import { StyleSheet, Text, View, FlatList, ScrollView } from 'react-native';
 import React, { useEffect } from 'react';
 import AppText from '../../components/AppText';
 import { container } from '../../constants/container';
@@ -71,56 +71,58 @@ const DashBoard = () => {
   return (
     <>
       <AppHeader title={'Dashboard'} />
-      <View style={container}>
-        <View style={styles.tripTitle}>
-          <AppText style={{ fontSize: s(18) }} variant="bold">
-            Active Trips
-          </AppText>
+      <ScrollView showsVerticalScrollIndicator={false} style={container}>
+        <View>
+          <View style={styles.tripTitle}>
+            <AppText style={{ fontSize: s(18) }} variant="bold">
+              Active Trips
+            </AppText>
+          </View>
+          <FlatList
+            data={tripsData}
+            keyExtractor={item => item.tripId.toString()}
+            renderItem={({ item }) => {
+              return (
+                <TripCard
+                  type="active"
+                  vehicleId={item.vehicleId}
+                  time={item.time}
+                  from={item.from}
+                  to={item.to}
+                  tripId={item.tripId}
+                  status={item.status}
+                />
+              );
+            }}
+            horizontal={true}
+            showsHorizontalScrollIndicator={false}
+          />
+          <View style={styles.tripTitle}>
+            <AppText style={{ fontSize: s(18) }} variant="bold">
+              Upcoming Trips
+            </AppText>
+          </View>
+          <FlatList
+            data={tripsData}
+            keyExtractor={item => item.tripId.toString()}
+            renderItem={({ item }) => {
+              return (
+                <TripCard
+                  type="upcoming"
+                  vehicleId={item.vehicleId}
+                  time={item.time}
+                  from={item.from}
+                  to={item.to}
+                  tripId={item.tripId}
+                  status={item.status}
+                />
+              );
+            }}
+            horizontal={true}
+            showsHorizontalScrollIndicator={false}
+          />
         </View>
-        <FlatList
-          data={tripsData}
-          keyExtractor={item => item.tripId.toString()}
-          renderItem={({ item }) => {
-            return (
-              <TripCard
-                type="active"
-                vehicleId={item.vehicleId}
-                time={item.time}
-                from={item.from}
-                to={item.to}
-                tripId={item.tripId}
-                status={item.status}
-              />
-            );
-          }}
-          horizontal={true}
-          showsHorizontalScrollIndicator={false}
-        />
-        <View style={styles.tripTitle}>
-          <AppText style={{ fontSize: s(18) }} variant="bold">
-            Upcoming Trips
-          </AppText>
-        </View>
-        <FlatList
-          data={tripsData}
-          keyExtractor={item => item.tripId.toString()}
-          renderItem={({ item }) => {
-            return (
-              <TripCard
-                type="upcoming"
-                vehicleId={item.vehicleId}
-                time={item.time}
-                from={item.from}
-                to={item.to}
-                tripId={item.tripId}
-                status={item.status}
-              />
-            );
-          }}
-          horizontal={true}
-          showsHorizontalScrollIndicator={false}
-        />
-      </View>
+      </ScrollView>
     </>
   );
 };

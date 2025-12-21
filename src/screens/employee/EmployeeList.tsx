@@ -18,6 +18,7 @@ import AppButton from '../../components/AppButton';
 import { scale as s } from 'react-native-size-matters';
 import AppText from '../../components/AppText';
 import EmployeeDetails from './EmployeeDetails';
+import { useNavigation } from '@react-navigation/native';
 
 interface Employee {
   id: string;
@@ -28,8 +29,7 @@ interface Employee {
 }
 
 const EmployeeList = () => {
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const navigation = useNavigation<any>();
 
   const employeeData: Employee[] = [
     {
@@ -115,8 +115,9 @@ const EmployeeList = () => {
   ];
 
   const handleEmployeeSelect = (employee: Employee) => {
-    setSelectedEmployee(employee);
-    setModalVisible(true);
+    navigation.navigate('EmployeeDetails', {
+      selectedEmployee: employee,
+    });
   };
 
   return (
@@ -160,16 +161,6 @@ const EmployeeList = () => {
           )}
           showsVerticalScrollIndicator={false}
         />
-
-        {selectedEmployee && (
-          <EmployeeDetails
-            modalVisible={modalVisible}
-            imageURI={selectedEmployee.imageURI}
-            name={selectedEmployee.name}
-            title={selectedEmployee.title}
-            onClose={() => setModalVisible(false)}
-          />
-        )}
       </View>
     </>
   );

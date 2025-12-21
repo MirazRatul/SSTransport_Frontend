@@ -4,14 +4,28 @@ import BottomTab from './BottomTab';
 import AuthStack from './AuthStack';
 import auth from '@react-native-firebase/auth';
 import BootSplash from 'react-native-bootsplash';
+import EmployeeDetails from '../screens/employee/EmployeeDetails';
+import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import VehiclesDetails from '../screens/vehicles/VehiclesDetails';
 
 const Stack = createNativeStackNavigator();
 
 const MainStack = () => {
   const [user, setUser] = useState<any>(null);
   const [initializing, setInitializing] = useState(true);
+  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
 
   useEffect(() => {
+    const checkOnboarding = async () => {
+      const alreadyLaunched = await AsyncStorage.getItem('onboarding');
+      if (alreadyLaunched === null) {
+        setIsFirstLaunch(true);
+      } else {
+        setIsFirstLaunch(false);
+      }
+    };
+
     const unsubscribe = auth().onAuthStateChanged(currentUser => {
       (async () => {
         if (currentUser) {
@@ -32,22 +46,42 @@ const MainStack = () => {
       })();
     });
 
+    checkOnboarding();
+
     return unsubscribe;
   }, []);
 
   // Hide BootSplash after navigator is ready
   useEffect(() => {
-    if (!initializing) {
+    if (!initializing && isFirstLaunch !== null) {
       BootSplash.hide({ fade: true });
     }
-  }, [initializing]);
+  }, [initializing, isFirstLaunch]);
 
-  if (initializing) return null; // keep splash visible
+  if (initializing || isFirstLaunch === null) {
+    return null; 
+  } // keep splash visible
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {user ? (
-        <Stack.Screen name="BottomTab" component={BottomTab} />
+    <Stack.Navigator
+      screenOptions={{ headerShown: false }}
+    >
+      {isFirstLaunch ? (
+        <Stack.Screen name="onboarding">
+          {props => (
+            <OnboardingScreen 
+              {...props} 
+              //function to update state when done
+              onFinish={() => setIsFirstLaunch(false)} 
+            />
+          )}
+        </Stack.Screen>
+      ) : user ? (
+        <>
+          <Stack.Screen name="BottomTab" component={BottomTab} />
+          <Stack.Screen name="EmployeeDetails" component={EmployeeDetails} />
+          <Stack.Screen name="VehicleDetails" component={VehiclesDetails}/>
+        </>
       ) : (
         <Stack.Screen name="AuthStack" component={AuthStack} />
       )}

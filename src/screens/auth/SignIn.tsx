@@ -134,6 +134,8 @@ const SignIn = ({ onGoToSignUp }: SignInProps) => {
 
       dispatch(setUserData(userObject));
 
+      await AsyncStorage.setItem('userData', JSON.stringify(userObject));
+
       Alert.alert('Google Login Successful');
     } catch (error: any) {
       console.log('Google Sign-In error:', error);

@@ -10,6 +10,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { scale as s } from 'react-native-size-matters';
 import { AppColors } from '../../styles/colors';
 import { LogOut } from 'lucide-react-native';
+import CommonHeader from '../../components/CommonHeader';
 
 const Profile = () => {
   const profileData = [
@@ -31,6 +32,7 @@ const Profile = () => {
   };
   return (
     <SafeAreaView style={container}>
+      <CommonHeader title="Profile" /> 
       <View style={{ flex: 1, justifyContent: 'center' }}>
         {profileData.map(item => (
           <View style={styles.profileContainer} key={item.email}>

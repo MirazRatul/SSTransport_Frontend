@@ -3,7 +3,9 @@ import React, { Children } from 'react';
 import { scale as s, vs } from 'react-native-size-matters';
 import { AppColors } from '../styles/colors';
 import AppText from './AppText';
-import { ArrowLeft } from 'lucide-react-native';
+import { Menu } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { DrawerActions } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface AppHeaderProps {
@@ -11,8 +13,12 @@ interface AppHeaderProps {
 }
 
 const AppHeader: React.FC<AppHeaderProps> = ({ title }) => {
+  const navigation = useNavigation();
   return (
     <SafeAreaView style={styles.headerContainer}>
+      <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
+        <Menu size={s(24)} color={AppColors.textColor}/>
+      </TouchableOpacity>
       <View style={styles.textContainer}>
         <AppText style={{color: AppColors.textColor, fontSize: s(18)}} variant="bold">{title}</AppText>
       </View>
@@ -32,7 +38,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: s(20),
     paddingTop: s(20),
-    paddingBottom: s(30),
+    paddingBottom: s(20),
     borderWidth: .3,
     borderBottomColor: AppColors.textColor
   },
@@ -42,5 +48,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
+    marginRight: s(24),
   },
 });

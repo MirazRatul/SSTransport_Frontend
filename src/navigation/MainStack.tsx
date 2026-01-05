@@ -8,6 +8,8 @@ import EmployeeDetails from '../screens/employee/EmployeeDetails';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import VehiclesDetails from '../screens/vehicles/VehiclesDetails';
+import DrawerStack from './DrawerStack';
+import TripDetails from '../screens/trip/TripDetails';
 
 const Stack = createNativeStackNavigator();
 
@@ -78,9 +80,10 @@ const MainStack = () => {
         </Stack.Screen>
       ) : user ? (
         <>
-          <Stack.Screen name="BottomTab" component={BottomTab} />
+          <Stack.Screen name="DrawerTab" component={DrawerStack} />
           <Stack.Screen name="EmployeeDetails" component={EmployeeDetails} />
           <Stack.Screen name="VehicleDetails" component={VehiclesDetails}/>
+          <Stack.Screen name="TripDetails" component={TripDetails}/>
         </>
       ) : (
         <Stack.Screen name="AuthStack" component={AuthStack} />

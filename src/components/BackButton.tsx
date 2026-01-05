@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
   backIcon: {
     position: 'absolute',
     top: s(10),
-    left: s(10),
+    left: s(0),
     justifyContent: 'center',
     alignItems: 'center',
   },

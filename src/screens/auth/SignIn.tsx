@@ -1,6 +1,5 @@
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -28,6 +27,7 @@ import { clearUserData, setUserData } from '../../store/reducers/userSlice';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useToast } from '../../components/Toast/ToastContext';
 
 interface SignInProps {
   onGoToSignUp: () => void;
@@ -41,6 +41,8 @@ const SignIn = ({ onGoToSignUp }: SignInProps) => {
   const [loading, setLoading] = useState(false);
 
   const dispatch = useDispatch();
+
+  const { showToast } = useToast();
 
   const handleSignIn = async () => {
     try {
@@ -59,16 +61,12 @@ const SignIn = ({ onGoToSignUp }: SignInProps) => {
       const currentUser = auth().currentUser || userCredential.user;
 
       if (!currentUser?.emailVerified) {
-        // Immediately sign out so an unverified user isn't kept authenticated
-
         await auth().signOut();
-
-        Alert.alert(
-          'Email Not Verified',
-
-          'Please verify your email before signing in. Check your inbox for the verification link.',
-        );
-
+        showToast({
+          message: 'Please verify your email before signing in. Check your inbox.',
+          type: 'warning',
+          duration: 4000,
+        });
         return;
       }
 
@@ -84,11 +82,18 @@ const SignIn = ({ onGoToSignUp }: SignInProps) => {
 
       await AsyncStorage.setItem('userData', JSON.stringify(userObject));
 
-      Alert.alert('Login Successful');
+      showToast({ message: 'Login successful!', type: 'success' });
     } catch (error: any) {
-      console.log('An Error Occurred: ', error);
+      let errorMessage = "";
 
-      Alert.alert('Login Failed: ', error.message);
+      if(error.code === 'auth/invalid-credential') {
+        errorMessage = 'Invalid email or password.';
+      } else {
+        errorMessage = error.message ?? 'Login failed.';
+      }
+
+      console.log('An Error Occurred: ', error);
+      showToast({ message: errorMessage, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -136,7 +141,7 @@ const SignIn = ({ onGoToSignUp }: SignInProps) => {
 
       await AsyncStorage.setItem('userData', JSON.stringify(userObject));
 
-      Alert.alert('Google Login Successful');
+      showToast({ message: 'Google login successful!', type: 'success' });
     } catch (error: any) {
       console.log('Google Sign-In error:', error);
 
@@ -144,7 +149,7 @@ const SignIn = ({ onGoToSignUp }: SignInProps) => {
         return; // user cancelled
       }
 
-      Alert.alert('Google Sign-In Failed', error.message);
+      showToast({ message: error.message ?? 'Google Sign-In failed.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -152,8 +157,7 @@ const SignIn = ({ onGoToSignUp }: SignInProps) => {
 
   const handleForgotPassword = async () => {
     if (!email) {
-      Alert.alert('Email is required, Please enter your email first');
-
+      showToast({ message: 'Please enter your email first.', type: 'warning' });
       return;
     }
 
@@ -162,23 +166,19 @@ const SignIn = ({ onGoToSignUp }: SignInProps) => {
 
       await auth().sendPasswordResetEmail(email);
 
-      Alert.alert(
-        'Reset Email Sent',
-
-        'Check your inbox to reset your password.',
-      );
+      showToast({ message: 'Password reset email sent. Check your inbox.', type: 'success', duration: 4000 });
     } catch (error: any) {
       console.log('Forgot Password Error: ', error);
 
       let message = 'Something went wrong while resetting password';
 
       if (error.code === 'auth/user-not-found') {
-        message = 'User Not Found';
+        message = 'User not found';
       } else if (error.code === 'auth/invalid-email') {
-        message = 'Invalid Email Address';
+        message = 'Invalid email address';
       }
 
-      Alert.alert('Reset Failed', message);
+      showToast({ message, type: 'error' });
     } finally {
       setLoading(false);
     }

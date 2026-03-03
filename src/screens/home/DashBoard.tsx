@@ -4,7 +4,7 @@ import AppText from '../../components/AppText';
 import { container } from '../../constants/container';
 import AppHeader from '../../components/AppHeader';
 import TripCard from '../../components/TripCard';
-import { scale as s } from 'react-native-size-matters';
+import { scale as s, vs } from 'react-native-size-matters';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DashBoard = () => {
@@ -71,7 +71,13 @@ const DashBoard = () => {
   return (
     <>
       <AppHeader title={'Dashboard'} />
-      <ScrollView showsVerticalScrollIndicator={false} style={container}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={container}
+        contentContainerStyle={{
+          paddingBottom: vs(20),
+        }}
+      >
         <View>
           <View style={styles.tripTitle}>
             <AppText style={{ fontSize: s(18) }} variant="bold">
@@ -120,6 +126,7 @@ const DashBoard = () => {
             }}
             horizontal={true}
             showsHorizontalScrollIndicator={false}
+            nestedScrollEnabled={true}
           />
         </View>
       </ScrollView>

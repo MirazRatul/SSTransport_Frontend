@@ -1,6 +1,7 @@
 import {
   Alert,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -8,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import EmployeeCard from '../../components/EmployeeCard';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { sharedPadding } from '../../constants/SharedPadding';
 import { AppColors } from '../../styles/colors';
 import { container } from '../../constants/container';
@@ -19,117 +20,58 @@ import { scale as s } from 'react-native-size-matters';
 import AppText from '../../components/AppText';
 import EmployeeDetails from './EmployeeDetails';
 import { useNavigation } from '@react-navigation/native';
+import apiClient from '../../api/api';
+import EmployeeListSkeleton from '../../components/SkeletonLoader/EmployeeListSkeleton';
 
+// Shape returned by the backend — image fields are full Cloudinary URLs
 interface Employee {
-  id: string;
-  imageURI: string;
-  heading: string;
+  id: number;
   name: string;
-  title: string;
+  image: string;              // Cloudinary URL e.g. "https://res.cloudinary.com/.../employees/rahim.jpg"
+  contact: string;
+  nidNo: string;
+  nidPic: string;
   role: string;
+  drivingLicenseNo: string | null;
+  drivingLicenseImg: string | null; // Cloudinary URL or null
 }
 
 const EmployeeList = () => {
   const navigation = useNavigation<any>();
   const [activeBtn, setActiveBtn] = useState('All');
-
-  const employeeData = useMemo<Employee[]>(
-    () => [
-      {
-        id: '1',
-        imageURI:
-          'https://img.freepik.com/free-vector/smiling-young-man-illustration_1308-174669.jpg',
-        heading: 'Driver',
-        name: 'Miraz',
-        title: 'Truck Driver',
-        role: 'driver',
-      },
-      {
-        id: '2',
-        imageURI:
-          'https://img.freepik.com/free-vector/young-man-avatar-character_24877-947.jpg',
-        heading: 'Driver',
-        name: 'Rahim',
-        title: 'Helper',
-        role: 'helper',
-      },
-      {
-        id: '3',
-        imageURI:
-          'https://img.freepik.com/free-vector/man-avatar-profile-picture_18591-58483.jpg',
-        heading: 'Driver',
-        name: 'Karim',
-        title: 'Truck Driver',
-        role: 'manager',
-      },
-      {
-        id: '4',
-        imageURI:
-          'https://img.freepik.com/free-vector/young-man-with-glasses-illustration_1308-174706.jpg',
-        heading: 'Driver',
-        name: 'Sajid',
-        title: 'Truck Driver',
-        role: 'driver',
-      },
-      {
-        id: '5',
-        imageURI:
-          'https://img.freepik.com/free-vector/smiling-young-man-illustration_1308-174671.jpg',
-        heading: 'Driver',
-        name: 'Fahim',
-        title: 'Truck Driver',
-        role: 'manager',
-      },
-      {
-        id: '6',
-        imageURI:
-          'https://img.freepik.com/free-vector/man-avatar-profile-picture_18591-58481.jpg',
-        heading: 'Driver',
-        name: 'Nayeem',
-        title: 'Truck Driver',
-        role: 'manager',
-      },
-      {
-        id: '7',
-        imageURI:
-          'https://img.freepik.com/free-vector/young-man-avatar-character_24877-948.jpg',
-        heading: 'Driver',
-        name: 'Imran',
-        title: 'Truck Driver',
-        role: 'helper',
-      },
-      {
-        id: '8',
-        imageURI:
-          'https://img.freepik.com/free-vector/young-man-with-beard-illustration_1308-174700.jpg',
-        heading: 'Driver',
-        name: 'Arif',
-        title: 'Truck Driver',
-        role: 'manager',
-      },
-      {
-        id: '9',
-        imageURI:
-          'https://img.freepik.com/free-vector/smiling-young-man-illustration_1308-174670.jpg',
-        heading: 'Driver',
-        name: 'Hasan',
-        title: 'Truck Driver',
-        role: 'helper',
-      },
-      {
-        id: '10',
-        imageURI:
-          'https://img.freepik.com/free-vector/young-man-avatar-profile_24877-9475.jpg',
-        heading: 'Driver',
-        name: 'Tanvir',
-        title: 'Truck Driver',
-        role: 'helper',
-      },
-    ],
-    [],
-  );
-
+  const [employeeData, setEmployeeData] = useState<Employee[]>([]);
   const [searchText, setSearchText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchEmployee = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/employees');
+      setEmployeeData(response.data);
+    } catch (error) {
+      console.log('Error fetching employee data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await fetchEmployee();
+    } catch (error) {
+      console.log('Error refreshing employee data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log('Fetching employee data...');
+    fetchEmployee();
+    console.log('Employee data state after fetch:',JSON.stringify(employeeData, null, 2));
+  },[]);
 
   const handleEmployeeSelect = (employee: Employee) => {
     navigation.navigate('EmployeeDetails', {
@@ -230,27 +172,37 @@ const EmployeeList = () => {
             </AppText>
           </TouchableOpacity>
         </View>
-        <FlatList
-          data={filteredData}
-          keyExtractor={item => item.id.toString()}
-          renderItem={({ item }) => (
-            <EmployeeCard
-              imageURI={item.imageURI}
-              heading={item.heading}
-              name={item.name}
-              title={item.title}
-              onPress={() => handleEmployeeSelect(item)}
-            />
-          )}
-          ListEmptyComponent={
-            searchText.length > 0 ? (
+        {loading ? (
+          <EmployeeListSkeleton count={6} />
+        ) : (
+          <FlatList
+            data={filteredData}
+            keyExtractor={item => item.id.toString()}
+            renderItem={({ item }) => (
+              <EmployeeCard
+                imageURI={item.image}
+                name={item.name}
+                role={item.role}
+                onPress={() => handleEmployeeSelect(item)}
+              />
+            )}
+            ListEmptyComponent={
               <View style={styles.noDataFound}>
                 <AppText>No Result Found!!</AppText>
               </View>
-            ) : null
-          }
-          showsVerticalScrollIndicator={false}
-        />
+            }
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{}}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[AppColors.secondaryColor]}
+                tintColor={AppColors.secondaryColor}
+              />
+            }
+          />
+        )}
       </View>
     </>
   );

@@ -35,7 +35,7 @@ const VehiclesDetails = ({ route }: any) => {
 
   const { selectedVehicle } = route.params;
   return (
-    <SafeAreaView style={container}>
+    <SafeAreaView style={[container, {paddingBottom: s(10)}]}>
       <CommonHeader title="Vehicle Details" />
       <ScrollView style={styles.detailsContainer} contentContainerStyle={{
         paddingBottom: vs(20)
@@ -92,7 +92,7 @@ const VehiclesDetails = ({ route }: any) => {
           heading="Assigned Driver"
           onPress={() => Alert.alert('Employee Selected')}
           name="Aminul Islam"
-          title="Driver"
+          role="Driver"
           imageURI="https://img.freepik.com/premium-vector/man-avatar-profile-picture-isolated-background-avatar-profile-picture-man_1293239-4841.jpg?semt=ais_hybrid&w=740&q=80"
         />
 

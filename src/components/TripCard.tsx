@@ -1,10 +1,11 @@
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import React from 'react';
 import { scale as s } from 'react-native-size-matters';
 import { AppColors } from '../styles/colors';
 import { Truck, ArrowRight } from 'lucide-react-native';
 import AppText from './AppText';
 import AppButton from './AppButton';
+import { useToast } from './Toast/ToastContext';
 
 interface TripCardProps {
   tripId: string;
@@ -27,6 +28,7 @@ const TripCard: React.FC<TripCardProps> = ({
   type = 'active',
   vehicleId,
 }) => {
+  const { showToast } = useToast();
   return (
     <View style={[styles.tripContainer]}>
       <View style={styles.tripHeader}>
@@ -117,7 +119,7 @@ const TripCard: React.FC<TripCardProps> = ({
           },
         ]}
         title="Details"
-        onPress={() => Alert.alert('No Details Right Now!!')}
+        onPress={() => showToast({ message: 'On Going Feature', type: 'info' })}
       />
     </View>
   );

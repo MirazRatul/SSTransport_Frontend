@@ -6,15 +6,18 @@ import MainStack from './src/navigation/MainStack';
 import { Provider } from 'react-redux';
 import store from './src/store/store';
 import DrawerStack from './src/navigation/DrawerStack';
+import { ToastProvider } from './src/components/Toast/ToastContext';
 
 function App() {
   return (
     <Provider store={store}>
       <SafeAreaProvider>
-        <NavigationContainer>
-          {/* <DrawerStack /> */}
-          <MainStack />
-        </NavigationContainer>
+        <ToastProvider>
+          <NavigationContainer>
+            {/* <DrawerStack /> */}
+            <MainStack />
+          </NavigationContainer>
+        </ToastProvider>
       </SafeAreaProvider>
     </Provider>
   );

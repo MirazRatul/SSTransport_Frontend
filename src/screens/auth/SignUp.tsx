@@ -1,6 +1,5 @@
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -13,6 +12,7 @@ import AppText from '../../components/AppText';
 import AppButton from '../../components/AppButton';
 import auth from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useToast } from '../../components/Toast/ToastContext';
 
 interface SignUpProps {
   onGoToSignIn: () => void;
@@ -25,9 +25,11 @@ const SignUp = ({ onGoToSignIn }: SignUpProps) => {
   const [loading, setLoading] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  const { showToast } = useToast();
+
   const handleSignUp = async () => {
     if (password !== confirmPassword) {
-      Alert.alert('Password do not match');
+      showToast({ message: 'Passwords do not match.', type: 'warning' });
       return;
     }
     try {
@@ -47,19 +49,15 @@ const SignUp = ({ onGoToSignIn }: SignUpProps) => {
 
       await AsyncStorage.setItem('Name', name.trim());
 
-      Alert.alert(
-        'Verify Email',
-        'A verification link has been sent to your email. Please verify before signing in.',
-        [
-          {
-            text: 'OK',
-            onPress: () => onGoToSignIn(),
-          },
-        ],
-      );
+      showToast({
+        message: 'Verification link sent to your email. Please verify before signing in.',
+        type: 'success',
+        duration: 5000,
+      });
+      onGoToSignIn();
     } catch (error: any) {
       console.log('An Error Occurred: ', error);
-      Alert.alert('Sign Up Failed', error.message);
+      showToast({ message: error.message ?? 'Sign up failed.', type: 'error' });
     } finally {
       setLoading(false);
     }

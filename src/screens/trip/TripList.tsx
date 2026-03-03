@@ -7,6 +7,7 @@ import AllTripsCard from '../../components/trips/AllTripsCard';
 import AppInput from '../../components/AppInput';
 import { useNavigation } from '@react-navigation/native';
 import TripDetails from './TripDetails';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const TripList = () => {
   const navigation = useNavigation<any>();
@@ -71,7 +72,7 @@ const TripList = () => {
   return (
     <>
       <AppHeader title="Trips" />
-      <View style={container}>
+      <SafeAreaView style={container} edges={['bottom']}>
         <AppInput
           type="search"
           placeholder="Search Trip..."
@@ -100,7 +101,7 @@ const TripList = () => {
             )
           }
         />
-      </View>
+      </SafeAreaView>
     </>
   );
 };

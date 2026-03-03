@@ -30,7 +30,7 @@ export default AppHeader;
 
 const styles = StyleSheet.create({
   headerContainer: {
-    height: s(50),
+    height: s(30),
     width: '100%',
     backgroundColor: AppColors.primaryColor,
     flexDirection: 'row',

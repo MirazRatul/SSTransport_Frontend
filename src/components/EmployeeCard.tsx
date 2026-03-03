@@ -5,28 +5,24 @@ import { AppColors } from '../styles/colors';
 import AppText from './AppText';
 
 interface EmployeeCardProps {
-  heading: string;
   imageURI: string;
   name: string;
-  title: string;
+  role: string;
   onPress: () => void;
+  heading?: string;
 }
 
-const EmployeeCard = ({
-  heading,
-  imageURI,
-  name,
-  title,
-  onPress,
-}: EmployeeCardProps) => {
+const EmployeeCard = ({ imageURI, name, role, onPress }: EmployeeCardProps) => {
   return (
     <TouchableOpacity style={styles.cardContainer} onPress={onPress}>
-      <AppText variant="bold">{heading}</AppText>
+      <AppText variant="bold">
+        {role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()}
+      </AppText>
       <View style={styles.infoContainer}>
         <Image style={styles.image} source={{ uri: imageURI }} />
         <View style={styles.employee}>
           <AppText variant="bold">{name}</AppText>
-          <AppText style={{ fontSize: s(11) }}>{title}</AppText>
+          <AppText style={{ fontSize: s(11) }}>{role}</AppText>
         </View>
       </View>
     </TouchableOpacity>

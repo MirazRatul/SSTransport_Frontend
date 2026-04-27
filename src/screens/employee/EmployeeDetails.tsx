@@ -1,6 +1,7 @@
 import {
   Alert,
   Image,
+  Linking,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -17,109 +18,134 @@ import AppButton from '../../components/AppButton';
 import { Phone, MessageSquare } from 'lucide-react-native';
 
 const EmployeeDetails = ({ route }: any) => {
-  const employeeInfo = [
-    {
-      uniqueId: 'UID-876543',
-      contactNumber: '+8801704825020',
-      nidNumber: '286-330-8389',
-      role: 'Driver',
-      drivingLicense: 'DL-ABC=987654',
-    },
-  ];
   const { selectedEmployee } = route.params;
+
+  if (!selectedEmployee) {
+    return (
+      <SafeAreaView style={container}>
+        <CommonHeader title="Employee Details" />
+        <View style={styles.centerContainer}>
+          <AppText>No employee data available</AppText>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const handleCall = async () => {
+    if (!selectedEmployee.contact) {
+      Alert.alert('Error', 'Contact number not available');
+      return;
+    }
+    try {
+      await Linking.openURL(`tel:${selectedEmployee.contact}`);
+    } catch (error) {
+      Alert.alert('Error', 'Unable to make call');
+      console.error('Call error:', error);
+    }
+  };
+
   return (
     <SafeAreaView style={container}>
       <CommonHeader title="Employee Details" />
-      {selectedEmployee && (
-        <ScrollView
-          style={styles.detailsContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.nameSection}>
-            <Image
-              source={{ uri: selectedEmployee.imageURI }}
-              style={styles.image}
-            />
-            <AppText style={{ fontSize: s(20) }} variant="bold">
-              {selectedEmployee.name}
+      <ScrollView
+        style={styles.detailsContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.nameSection}>
+          <Image
+            source={{ uri: selectedEmployee.image }}
+            style={styles.image}
+          />
+          <AppText style={{ fontSize: s(20) }} variant="bold">
+            {selectedEmployee.name}
+          </AppText>
+          <AppText style={{ fontSize: s(13) }}>
+            {selectedEmployee.role}
+          </AppText>
+        </View>
+        <View style={styles.separator} />
+        <View style={styles.callContainer}>
+          <TouchableOpacity style={styles.btn} onPress={handleCall}>
+            <View style={styles.btnInside}>
+              <Phone size={s(15)} color={AppColors.primaryColor} />
+              <AppText
+                variant="bold"
+                style={[styles.text, { color: AppColors.primaryColor }]}
+              >
+                Call
+              </AppText>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.btn,
+              {
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderColor: AppColors.secondaryColor,
+              },
+            ]}
+          >
+            <View style={styles.btnInside}>
+              <MessageSquare size={s(15)} color={AppColors.secondaryColor} />
+              <AppText
+                variant="bold"
+                style={[styles.text, { color: AppColors.secondaryColor }]}
+              >
+                Message
+              </AppText>
+            </View>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.separator} />
+        <View style={styles.employeeInfoContainer}>
+          <View style={styles.info}>
+            <AppText style={styles.infoTextTitle}>Employee ID</AppText>
+            <AppText style={styles.infoText}>{selectedEmployee.id}</AppText>
+            <View style={styles.separator} />
+
+            <AppText style={styles.infoTextTitle}>Contact Number</AppText>
+            <AppText style={styles.infoText}>{selectedEmployee.contact}</AppText>
+            <View style={styles.separator} />
+
+            <AppText style={styles.infoTextTitle}>NID Number</AppText>
+            <AppText style={styles.infoText}>{selectedEmployee.nidNo}</AppText>
+            <View style={styles.separator} />
+
+            <AppText style={styles.infoTextTitle}>Role</AppText>
+            <AppText style={styles.infoText}>{selectedEmployee.role}</AppText>
+            <View style={styles.separator} />
+
+            <AppText style={styles.infoTextTitle}>Driving License</AppText>
+            <AppText style={styles.infoText}>
+              {selectedEmployee.drivingLicenseNo || 'N/A'}
             </AppText>
-            <AppText style={{ fontSize: s(13) }}>
-              {selectedEmployee.title}
-            </AppText>
           </View>
-          <View style={styles.separator} />
-          <View style={styles.callContainer}>
-            <TouchableOpacity style={styles.btn}>
-              <View style={styles.btnInside}>
-                <Phone size={s(15)} color={AppColors.primaryColor} />
-                <AppText
-                  variant="bold" 
-                  style={[styles.text, { color: AppColors.primaryColor }]}
-                >
-                  Call
-                </AppText>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.btn,
-                {
-                  backgroundColor: 'transparent',
-                  borderWidth: 1,
-                  borderColor: AppColors.secondaryColor,
-                },
-              ]}
-            >
-              <View style={styles.btnInside}>
-                <MessageSquare size={s(15)} color={AppColors.secondaryColor} />
-                <AppText
-                  variant="bold"
-                  style={[styles.text, { color: AppColors.secondaryColor }]}
-                >
-                  Message
-                </AppText>
-              </View>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.separator} />
-          <View style={styles.employeeInfoContainer}>
-            {employeeInfo.map(item => (
-              <View style={styles.info} key={item.uniqueId}>
-                <AppText style={styles.infoTextTitle}>Unique ID</AppText>
-                <AppText style={styles.infoText}>{item.uniqueId}</AppText>
-                <View style={styles.separator} />
-
-                <AppText style={styles.infoTextTitle}>Contact Number</AppText>
-                <AppText style={styles.infoText}>{item.contactNumber}</AppText>
-                <View style={styles.separator} />
-
-                <AppText style={styles.infoTextTitle}>NID Number</AppText>
-                <AppText style={styles.infoText}>{item.nidNumber}</AppText>
-                <View style={styles.separator} />
-
-                <AppText style={styles.infoTextTitle}>Role</AppText>
-                <AppText style={styles.infoText}>{item.role}</AppText>
-                <View style={styles.separator} />
-
-                <AppText style={styles.infoTextTitle}>Driving License</AppText>
-                <AppText style={styles.infoText}>{item.drivingLicense}</AppText>
-              </View>
-            ))}
-          </View>
+        </View>
+        {selectedEmployee.nidPic && (
           <View style={styles.nidContainer}>
             <AppText style={{ fontSize: s(16) }} variant="bold">
-              Identity Documents
+              NID Document
             </AppText>
             <Image
-              source={{
-                uri: 'https://imgv2-2-f.scribdassets.com/img/document/658369602/original/a9e0b3a4b2/1?v=1',
-              }}
+              source={{ uri: selectedEmployee.nidPic }}
               style={styles.nidImage}
             />
           </View>
-        </ScrollView>
-      )}
+        )}
+        {selectedEmployee.drivingLicenseImg && (
+          <View style={styles.nidContainer}>
+            <AppText style={{ fontSize: s(16) }} variant="bold">
+              Driving License
+            </AppText>
+            <Image
+              source={{ uri: selectedEmployee.drivingLicenseImg }}
+              style={styles.nidImage}
+            />
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -131,6 +157,11 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: s(10),
     borderRadius: s(10),
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   separator: {
     height: 1,

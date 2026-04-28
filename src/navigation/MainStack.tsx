@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import VehiclesDetails from '../screens/vehicles/VehiclesDetails';
 import DrawerStack from './DrawerStack';
 import TripDetails from '../screens/trip/TripDetails';
+import AddVehicle from '../screens/vehicles/AddVehicle';
 
 const Stack = createNativeStackNavigator();
 
@@ -83,6 +84,7 @@ const MainStack = () => {
           <Stack.Screen name="DrawerTab" component={DrawerStack} />
           <Stack.Screen name="EmployeeDetails" component={EmployeeDetails} />
           <Stack.Screen name="VehicleDetails" component={VehiclesDetails}/>
+          <Stack.Screen name="AddVehicle" component={AddVehicle}/>
           <Stack.Screen name="TripDetails" component={TripDetails}/>
         </>
       ) : (

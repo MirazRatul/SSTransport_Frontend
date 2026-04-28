@@ -36,11 +36,11 @@ const VehiclesCard = ({
         <AppText variant="bold">{name}</AppText>
         <View style={styles.textContainer}>
           <View style={styles.sizeContainer}>
-            <AppText style={styles.text}>Size:</AppText>
+            <AppText style={[styles.text, styles.label]}>Size:</AppText>
             <AppText style={styles.text}>{size}</AppText>
           </View>
-          <View>
-            <AppText style={styles.text}>Capacity:</AppText>
+          <View style={styles.capacityContainer}>
+            <AppText style={[styles.text, styles.label]}>Capacity:</AppText>
             <AppText style={styles.text}>{capacity}</AppText>
           </View>
         </View>
@@ -100,9 +100,18 @@ const styles = StyleSheet.create({
   },
   sizeContainer: {
     marginEnd: s(20),
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  capacityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   text: {
     fontSize: s(13),
+  },
+  label: {
+    marginEnd: s(5),
   },
   statusContainer: {
     height: s(25),

@@ -220,17 +220,13 @@ const AddVehicle = () => {
         'fitness_certificate.jpg',
       );
 
-      // Get the driver and helper names
-      const selectedDriver = drivers.find(d => d.id === assignedDriver);
-      const selectedHelper = helpers.find(h => h.id === assignedHelper);
-
       const vehicleData = {
-        id: `VEH-${Date.now()}`, // Generate unique ID
+        id: `VEH-${Date.now()}`,
         regNumber: regNumber.trim(),
         vehicleSize,
         capacity: capacity.trim(),
-        assignedDriver: selectedDriver?.name || '',
-        assignedHelper: selectedHelper?.name || '',
+        assignedDriver: assignedDriver,
+        assignedHelper: assignedHelper,
         regCard: regCardUrl,
         fitnessCertificate: fitnessCertificateUrl,
         lastMaintenanceDate,

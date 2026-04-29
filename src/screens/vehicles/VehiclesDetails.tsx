@@ -1,5 +1,14 @@
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import React from 'react';
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  Modal,
+} from 'react-native';
+import React, { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { container } from '../../constants/container';
 import AppText from '../../components/AppText';
@@ -9,37 +18,132 @@ import CommonHeader from '../../components/CommonHeader';
 import EmployeeCard from '../../components/EmployeeCard';
 import { useNavigation } from '@react-navigation/native';
 import AppButton from '../../components/AppButton';
+import apiClient from '../../api/api';
+import { useToast } from '../../components/Toast/ToastContext';
+
+interface VehicleDetail {
+  vehicleId: number;
+  regNumber: string;
+  vehicleSize: string;
+  capacity: string;
+  regCard: string;
+  fitnessCertificate: string;
+  lastMaintenanceDate: string;
+  partsFixed: string;
+  assignedDriverId: number;
+  assignedDriverName: string;
+  assignedDriverRole: string;
+  assignedDriverImage: string;
+  assignedHelperId: number;
+  assignedHelperName: string;
+  assignedHelperRole: string;
+  assignedHelperImage: string;
+}
 
 const VehiclesDetails = ({ route }: any) => {
   const navigation = useNavigation();
+  const { showToast } = useToast();
+  const { selectedVehicle } = route.params;
+  const [vehicleDetail, setVehicleDetail] = useState<VehicleDetail | null>(
+    null,
+  );
+  const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<{
+    uri: string;
+    title: string;
+  } | null>(null);
+
   const tripDetails = [
-    {
-      tripId: 'TRP001',
-      from: 'Dhaka',
-      to: 'Chittagong',
-      date: '2023-11-20',
-    },
-    {
-      tripId: 'TRP02',
-      from: 'Dhaka',
-      to: 'Chittagong',
-      date: '2023-11-15',
-    },
-    {
-      tripId: 'TRP003',
-      from: 'Dhaka',
-      to: 'Chittagong',
-      date: '2023-11-10',
-    },
+    { tripId: 'TRP001', from: 'Dhaka', to: 'Chittagong', date: '2023-11-20' },
+    { tripId: 'TRP02', from: 'Dhaka', to: 'Chittagong', date: '2023-11-15' },
+    { tripId: 'TRP003', from: 'Dhaka', to: 'Chittagong', date: '2023-11-10' },
   ];
 
-  const { selectedVehicle } = route.params;
+  useEffect(() => {
+    const fetchVehicleDetails = async () => {
+      try {
+        setLoading(true);
+        const response = await apiClient.get(
+          `/vehicles/details/${selectedVehicle.id}`,
+        );
+        setVehicleDetail(response.data);
+      } catch (error) {
+        console.log('Error fetching vehicle details:', error);
+        showToast({ message: 'Failed to load vehicle details', type: 'error' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVehicleDetails();
+  }, [selectedVehicle.id]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[container, { paddingBottom: s(10) }]}>
+        <CommonHeader title="Vehicle Details" />
+        <View
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+        >
+          <ActivityIndicator size="large" color={AppColors.secondaryColor} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!vehicleDetail) {
+    return (
+      <SafeAreaView style={[container, { paddingBottom: s(10) }]}>
+        <CommonHeader title="Vehicle Details" />
+        <View
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+        >
+          <AppText>Failed to load vehicle details</AppText>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const vehicleStatus = vehicleDetail.assignedDriverId ? 'Active' : 'Available';
+
   return (
-    <SafeAreaView style={[container, {paddingBottom: s(10)}]}>
+    <SafeAreaView style={[container, { paddingBottom: s(10) }]}>
       <CommonHeader title="Vehicle Details" />
-      <ScrollView style={styles.detailsContainer} contentContainerStyle={{
-        paddingBottom: vs(20)
-      }}>
+
+      {/* ── Full-screen Image Modal ── */}
+      <Modal
+        visible={!!selectedImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedImage(null)}
+      >
+        <View style={styles.modalOverlay}>
+          {/* Header */}
+          <View style={styles.modalHeader}>
+            <AppText style={styles.modalTitle}>{selectedImage?.title}</AppText>
+            <TouchableOpacity
+              onPress={() => setSelectedImage(null)}
+              style={styles.closeBtn}
+            >
+              <AppText style={styles.closeBtnText}>✕</AppText>
+            </TouchableOpacity>
+          </View>
+
+          {/* Image */}
+          <View style={styles.modalImageWrapper}>
+            <Image
+              source={{ uri: selectedImage?.uri }}
+              style={styles.modalImage}
+              resizeMode="contain"
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <ScrollView
+        style={styles.detailsContainer}
+        contentContainerStyle={{ paddingBottom: vs(20) }}
+      >
         <View style={styles.informationCard}>
           <AppText
             style={{ marginBottom: s(10), fontSize: s(18) }}
@@ -48,16 +152,32 @@ const VehiclesDetails = ({ route }: any) => {
             Vehicle Information
           </AppText>
           <View style={styles.innerContainer}>
-            <AppText style={styles.innerText}>Plate Number</AppText>
-            <AppText style={styles.innerText}>Plate Number</AppText>
+            <AppText style={styles.innerText}>Registration Number</AppText>
+            <AppText style={styles.innerText}>
+              {vehicleDetail.regNumber}
+            </AppText>
           </View>
           <View style={styles.innerContainer}>
-            <AppText style={styles.innerText}>Size</AppText>
-            <AppText style={styles.innerText}>Size</AppText>
+            <AppText style={styles.innerText}>Vehicle Size</AppText>
+            <AppText style={styles.innerText}>
+              {vehicleDetail.vehicleSize}
+            </AppText>
           </View>
           <View style={styles.innerContainer}>
             <AppText style={styles.innerText}>Capacity</AppText>
-            <AppText style={styles.innerText}>Capacity</AppText>
+            <AppText style={styles.innerText}>{vehicleDetail.capacity}</AppText>
+          </View>
+          <View style={styles.innerContainer}>
+            <AppText style={styles.innerText}>Last Maintenance</AppText>
+            <AppText style={styles.innerText}>
+              {vehicleDetail.lastMaintenanceDate}
+            </AppText>
+          </View>
+          <View style={styles.innerContainer}>
+            <AppText style={styles.innerText}>Parts Fixed</AppText>
+            <AppText style={styles.innerText}>
+              {vehicleDetail.partsFixed || 'N/A'}
+            </AppText>
           </View>
           <View style={styles.innerContainer}>
             <AppText style={styles.innerText}>Current Status</AppText>
@@ -66,34 +186,81 @@ const VehiclesDetails = ({ route }: any) => {
                 styles.statusContainer,
                 {
                   borderColor:
-                    selectedVehicle.type === 'maintenance'
-                      ? '#e77878'
-                      : selectedVehicle.type === 'onTrip'
-                      ? AppColors.textColor
-                      : AppColors.secondaryColor,
-                },
-                {
+                    vehicleStatus === 'Active'
+                      ? AppColors.secondaryColor
+                      : '#4CAF50',
                   backgroundColor:
-                    selectedVehicle.type === 'maintenance'
-                      ? '#e77878'
-                      : selectedVehicle.type === 'onTrip'
-                      ? `${AppColors.cardColor}1A`
-                      : `${AppColors.secondaryColor}1A`,
+                    vehicleStatus === 'Active'
+                      ? `${AppColors.secondaryColor}1A`
+                      : '#4CAF501A',
                 },
               ]}
             >
-              <AppText style={{ fontSize: s(10) }}>
-                {selectedVehicle.vehicleStatus}
-              </AppText>
+              <AppText style={{ fontSize: s(10) }}>{vehicleStatus}</AppText>
             </View>
           </View>
         </View>
+
+        {/* Documents */}
+        <View style={styles.documentsContainer}>
+          <AppText
+            style={{ marginBottom: s(10), fontSize: s(14), fontWeight: 'bold' }}
+          >
+            Documents
+          </AppText>
+          <View style={styles.documentsGrid}>
+            <TouchableOpacity
+              style={styles.documentCard}
+              onPress={() =>
+                setSelectedImage({
+                  uri: vehicleDetail.regCard,
+                  title: 'Registration Card',
+                })
+              }
+            >
+              <Image
+                source={{ uri: vehicleDetail.regCard }}
+                style={styles.documentImage}
+              />
+              <AppText style={styles.documentLabel}>Registration Card</AppText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.documentCard}
+              onPress={() =>
+                setSelectedImage({
+                  uri: vehicleDetail.fitnessCertificate,
+                  title: 'Fitness Certificate',
+                })
+              }
+            >
+              <Image
+                source={{ uri: vehicleDetail.fitnessCertificate }}
+                style={styles.documentImage}
+              />
+              <AppText style={styles.documentLabel}>
+                Fitness Certificate
+              </AppText>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Assigned Driver */}
         <EmployeeCard
           heading="Assigned Driver"
-          onPress={() => Alert.alert('Employee Selected')}
-          name="Aminul Islam"
-          role="Driver"
-          imageURI="https://img.freepik.com/premium-vector/man-avatar-profile-picture-isolated-background-avatar-profile-picture-man_1293239-4841.jpg?semt=ais_hybrid&w=740&q=80"
+          onPress={() => Alert.alert('Driver Selected')}
+          name={vehicleDetail.assignedDriverName}
+          role={vehicleDetail.assignedDriverRole}
+          imageURI={vehicleDetail.assignedDriverImage}
+        />
+
+        {/* Assigned Helper */}
+        <EmployeeCard
+          heading="Assigned Helper"
+          onPress={() => Alert.alert('Helper Selected')}
+          name={vehicleDetail.assignedHelperName}
+          role={vehicleDetail.assignedHelperRole}
+          imageURI={vehicleDetail.assignedHelperImage}
         />
 
         <View style={styles.summaryContainer}>
@@ -115,6 +282,7 @@ const VehiclesDetails = ({ route }: any) => {
             </>
           ))}
         </View>
+
         <AppButton
           textStyle={{ fontSize: s(14), color: AppColors.primaryColor }}
           btnStyle={styles.btn1}
@@ -135,6 +303,49 @@ const VehiclesDetails = ({ route }: any) => {
 export default VehiclesDetails;
 
 const styles = StyleSheet.create({
+  // ── Modal ──────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: s(16),
+    paddingTop: vs(50),
+    paddingBottom: vs(12),
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: s(16),
+    fontWeight: 'bold',
+  },
+  closeBtn: {
+    width: s(32),
+    height: s(32),
+    borderRadius: s(16),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeBtnText: {
+    color: '#fff',
+    fontSize: s(14),
+  },
+  modalImageWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: s(12),
+    paddingBottom: vs(40),
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  // ── Existing styles ────────────────────────────
   detailsContainer: {
     flex: 1,
     paddingTop: s(20),
@@ -145,6 +356,34 @@ const styles = StyleSheet.create({
     padding: s(15),
     borderRadius: s(10),
     marginBottom: vs(15),
+  },
+  documentsContainer: {
+    backgroundColor: AppColors.cardColor,
+    padding: s(15),
+    borderRadius: s(10),
+    marginBottom: vs(15),
+  },
+  documentsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  documentCard: {
+    width: '48%',
+    alignItems: 'center',
+    backgroundColor: `${AppColors.secondaryColor}1A`,
+    padding: s(10),
+    borderRadius: s(8),
+  },
+  documentImage: {
+    width: s(80),
+    height: s(100),
+    borderRadius: s(6),
+    marginBottom: s(8),
+  },
+  documentLabel: {
+    fontSize: s(11),
+    textAlign: 'center',
+    color: AppColors.textColor,
   },
   innerText: {
     fontSize: s(13),
@@ -193,7 +432,7 @@ const styles = StyleSheet.create({
   btn1: {
     width: '100%',
     height: s(45),
-    marginBottom: s(14)
+    marginBottom: s(14),
   },
   btn2: {
     width: '100%',
@@ -201,5 +440,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: s(1),
     borderColor: AppColors.cardColor,
-  }
+  },
 });

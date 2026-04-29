@@ -11,6 +11,7 @@ import VehiclesDetails from '../screens/vehicles/VehiclesDetails';
 import DrawerStack from './DrawerStack';
 import TripDetails from '../screens/trip/TripDetails';
 import AddVehicle from '../screens/vehicles/AddVehicle';
+import AddTrip from '../screens/trip/AddTrip';
 
 const Stack = createNativeStackNavigator();
 
@@ -85,6 +86,7 @@ const MainStack = () => {
           <Stack.Screen name="EmployeeDetails" component={EmployeeDetails} />
           <Stack.Screen name="VehicleDetails" component={VehiclesDetails}/>
           <Stack.Screen name="AddVehicle" component={AddVehicle}/>
+          <Stack.Screen name="AddTrip" component={AddTrip}/>
           <Stack.Screen name="TripDetails" component={TripDetails}/>
         </>
       ) : (

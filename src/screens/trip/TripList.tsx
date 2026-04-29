@@ -1,4 +1,4 @@
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import React, { useMemo, useState } from 'react';
 import AppText from '../../components/AppText';
 import AppHeader from '../../components/AppHeader';
@@ -8,6 +8,9 @@ import AppInput from '../../components/AppInput';
 import { useNavigation } from '@react-navigation/native';
 import TripDetails from './TripDetails';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Plus } from 'lucide-react-native';
+import { AppColors } from '../../styles/colors';
+import { scale as s } from 'react-native-size-matters';
 
 const TripList = () => {
   const navigation = useNavigation<any>();
@@ -57,6 +60,10 @@ const TripList = () => {
     });
   };
 
+  const handleAddTrip = () => {
+    navigation.navigate('AddTrip');
+  };
+
   const filteredData = useMemo(() => {
     let data = tripDetails;
 
@@ -102,6 +109,15 @@ const TripList = () => {
           }
         />
       </SafeAreaView>
+
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={handleAddTrip}
+        activeOpacity={0.7}
+      >
+        <Plus size={28} color={AppColors.textColor} />
+      </TouchableOpacity>
     </>
   );
 };
@@ -113,5 +129,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: AppColors.secondaryColor,
+    opacity: 0.9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
 });

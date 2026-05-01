@@ -40,33 +40,75 @@ interface VehicleDetail {
   assignedHelperImage: string;
 }
 
+interface RecentTrip {
+  id: number | string;
+  date?: string;
+  pickupDest?: string;
+  dropDest?: string;
+  status?: string;
+}
+
+const formatTripDate = (date?: string) => {
+  if (!date) return 'N/A';
+
+  const parsedDate = new Date(date);
+  if (Number.isNaN(parsedDate.getTime())) return date;
+
+  return parsedDate.toLocaleDateString([], {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+const formatTripTime = (date?: string) => {
+  if (!date) return '';
+
+  const parsedDate = new Date(date);
+  if (Number.isNaN(parsedDate.getTime())) return '';
+
+  return parsedDate.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
 const VehiclesDetails = ({ route }: any) => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { showToast } = useToast();
   const { selectedVehicle } = route.params;
   const [vehicleDetail, setVehicleDetail] = useState<VehicleDetail | null>(
     null,
   );
+  const [recentTrips, setRecentTrips] = useState<RecentTrip[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<{
     uri: string;
     title: string;
   } | null>(null);
 
-  const tripDetails = [
-    { tripId: 'TRP001', from: 'Dhaka', to: 'Chittagong', date: '2023-11-20' },
-    { tripId: 'TRP02', from: 'Dhaka', to: 'Chittagong', date: '2023-11-15' },
-    { tripId: 'TRP003', from: 'Dhaka', to: 'Chittagong', date: '2023-11-10' },
-  ];
-
   useEffect(() => {
     const fetchVehicleDetails = async () => {
       try {
         setLoading(true);
-        const response = await apiClient.get(
+        const vehicleResponse = await apiClient.get(
           `/vehicles/details/${selectedVehicle.id}`,
         );
-        setVehicleDetail(response.data);
+        setVehicleDetail(vehicleResponse.data);
+
+        try {
+          const tripsResponse = await apiClient.get(
+            `/trips/vehicle/${selectedVehicle.id}/recent`,
+          );
+          setRecentTrips(
+            Array.isArray(tripsResponse.data)
+              ? tripsResponse.data
+              : tripsResponse.data?.data || [],
+          );
+        } catch (tripError) {
+          console.log('Error fetching recent trips:', tripError);
+          showToast({ message: 'Failed to load recent trips', type: 'error' });
+        }
       } catch (error) {
         console.log('Error fetching vehicle details:', error);
         showToast({ message: 'Failed to load vehicle details', type: 'error' });
@@ -76,7 +118,7 @@ const VehiclesDetails = ({ route }: any) => {
     };
 
     fetchVehicleDetails();
-  }, [selectedVehicle.id]);
+  }, [selectedVehicle.id, showToast]);
 
   if (loading) {
     return (
@@ -106,6 +148,12 @@ const VehiclesDetails = ({ route }: any) => {
 
   const vehicleStatus = vehicleDetail.assignedDriverId ? 'Active' : 'Available';
 
+  const handleTripPress = (tripId: number | string) => {
+    navigation.navigate('TripDetails', {
+      selectedTripId: tripId.toString(),
+    });
+  };
+
   return (
     <SafeAreaView style={[container, { paddingBottom: s(10) }]}>
       <CommonHeader title="Vehicle Details" />
@@ -114,7 +162,7 @@ const VehiclesDetails = ({ route }: any) => {
       <Modal
         visible={!!selectedImage}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setSelectedImage(null)}
       >
         <View style={styles.modalOverlay}>
@@ -267,20 +315,40 @@ const VehiclesDetails = ({ route }: any) => {
           <AppText variant="bold" style={styles.summaryText}>
             Recent Trips Summary
           </AppText>
-          {tripDetails.map((item, index) => (
-            <>
-              <View style={styles.tripParent} key={item.tripId}>
-                <View style={styles.tripChild}>
-                  <AppText variant="bold">Trip ID: {item.tripId}</AppText>
-                  <AppText style={styles.destinationText}>
-                    {item.from} to {item.to}
-                  </AppText>
-                </View>
-                <AppText style={styles.destinationText}>{item.date}</AppText>
+          {recentTrips.length > 0 ? (
+            recentTrips.map((item, index) => (
+              <View key={item.id}>
+                <TouchableOpacity
+                  style={styles.tripParent}
+                  onPress={() => handleTripPress(item.id)}
+                >
+                  <View style={styles.tripChild}>
+                    <AppText variant="bold">Trip ID: {item.id}</AppText>
+                    <AppText style={styles.destinationText}>
+                      {item.pickupDest || 'N/A'} to {item.dropDest || 'N/A'}
+                    </AppText>
+                  </View>
+                  <View style={styles.tripDateContainer}>
+                    <AppText style={styles.destinationText}>
+                      {formatTripDate(item.date)}
+                    </AppText>
+                    {formatTripTime(item.date) ? (
+                      <AppText style={styles.tripTimeText}>
+                        {formatTripTime(item.date)}
+                      </AppText>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+                {index < recentTrips.length - 1 ? (
+                  <View style={styles.separator} />
+                ) : null}
               </View>
-              <View style={styles.separator} key={index} />
-            </>
-          ))}
+            ))
+          ) : (
+            <AppText style={styles.destinationText}>
+              No recent trips found
+            </AppText>
+          )}
         </View>
 
         <AppButton
@@ -428,7 +496,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  tripChild: {},
+  tripChild: {
+    flex: 1,
+    marginRight: s(12),
+  },
+  tripDateContainer: {
+    alignItems: 'flex-end',
+  },
+  tripTimeText: {
+    fontSize: s(12),
+    color: '#bcc0c9',
+    marginTop: vs(2),
+  },
   btn1: {
     width: '100%',
     height: s(45),

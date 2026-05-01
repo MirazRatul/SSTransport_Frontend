@@ -1,6 +1,6 @@
 import {
   ActivityIndicator,
-  Alert,
+  AppState,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { container } from '../../constants/container';
 import AppText from '../../components/AppText';
 import auth from '@react-native-firebase/auth';
@@ -45,6 +46,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [fetchFailed, setFetchFailed] = useState(false);
 
   // edit mode state
   const [editMode, setEditMode] = useState(false);
@@ -59,54 +61,82 @@ const Profile = () => {
     undefined,
   ); // existing remote URL
 
+  // ─── Enter edit mode ───────────────────────────────────────────────────────
+  const enterEditMode = React.useCallback((data: UserData | null) => {
+    setEditName(data?.name ?? '');
+    setEditContact(data?.contact ?? '');
+    setEditImageUri(undefined);
+    setEditImageUrl(data?.imageUrl ?? undefined);
+    setEditMode(true);
+  }, []);
+
+  // ─── Fetch admin profile from backend ─────────────────────────────────────
+  const fetchUserData = React.useCallback(async (
+    id?: string | null,
+    showLoader = true,
+  ) => {
+    const resolvedId = id ?? userId;
+    if (!resolvedId) return;
+    try {
+      if (showLoader) setLoading(true);
+      const response = await apiClient.get(`/admins/${resolvedId}`);
+      const data: UserData = response.data;
+      setUserData(data);
+      setFetchFailed(false);
+    } catch (error: any) {
+      // 404 means admin not yet created — show edit form to create
+      if (error?.response?.status === 404) {
+        setUserData(null);
+        setFetchFailed(false);
+        enterEditMode(null);
+      } else {
+        setFetchFailed(true);
+        console.log('Error Fetching User Data: ', error);
+      }
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  }, [enterEditMode, userId]);
+
   // ─── Fetch user id & email from AsyncStorage ──────────────────────────────
-  const fetchUserIdEmail = async () => {
+  const fetchUserIdEmail = React.useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem('userData');
       const id = stored ? JSON.parse(stored).id : null;
       const email = stored ? JSON.parse(stored).email : null;
       setUserId(id);
       setUserEmail(email);
-      await fetchUserData(id, email);
+      await fetchUserData(id);
     } catch (error) {
       console.log('Error fetching user ID:', error);
     }
-  };
+  }, [fetchUserData]);
 
-  // ─── Fetch admin profile from backend ─────────────────────────────────────
-  const fetchUserData = async (id?: string | null, email?: string | null) => {
-    const resolvedId = id ?? userId;
-    if (!resolvedId) return;
-    try {
-      setLoading(true);
-      const response = await apiClient.get(`/admins/${resolvedId}`);
-      const data: UserData = response.data;
-      setUserData(data);
-    } catch (error: any) {
-      // 404 means admin not yet created — show edit form to create
-      if (error?.response?.status === 404) {
-        setUserData(null);
-        enterEditMode(null, email ?? userEmail);
-      } else {
-        console.log('Error Fetching User Data: ', error);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUserIdEmail();
+    }, [fetchUserIdEmail]),
+  );
 
   useEffect(() => {
-    fetchUserIdEmail();
-  }, []);
+    if (!fetchFailed || !userId) return;
 
-  // ─── Enter edit mode ───────────────────────────────────────────────────────
-  const enterEditMode = (data: UserData | null, email?: string | null) => {
-    setEditName(data?.name ?? '');
-    setEditContact(data?.contact ?? '');
-    setEditImageUri(undefined);
-    setEditImageUrl(data?.imageUrl ?? undefined);
-    setEditMode(true);
-  };
+    const retryFetch = () => {
+      if (AppState.currentState === 'active') {
+        fetchUserData(userId, false);
+      }
+    };
+
+    const intervalId = setInterval(retryFetch, 5000);
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') retryFetch();
+    });
+
+    return () => {
+      clearInterval(intervalId);
+      subscription.remove();
+    };
+  }, [fetchFailed, fetchUserData, userId]);
 
   const cancelEdit = () => {
     setEditMode(false);

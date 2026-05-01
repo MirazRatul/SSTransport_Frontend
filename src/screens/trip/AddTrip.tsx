@@ -8,9 +8,8 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { container } from '../../constants/container';
 import AppText from '../../components/AppText';
@@ -18,7 +17,7 @@ import { scale as s, vs } from 'react-native-size-matters';
 import { AppColors } from '../../styles/colors';
 import CommonHeader from '../../components/CommonHeader';
 import AppInput from '../../components/AppInput';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { ChevronDown } from 'lucide-react-native';
 import apiClient from '../../api/api';
 import { useToast } from '../../components/Toast/ToastContext';
@@ -35,10 +34,31 @@ interface CrewData {
   helperName: string;
 }
 
+interface TripDetail {
+  id: number | string;
+  date?: string;
+  pickupDest?: string;
+  dropDest?: string;
+  clientName?: string;
+  clientContact?: string;
+  driverId?: number | string;
+  driverName?: string;
+  helperId?: number | string;
+  helperName?: string;
+  vehicleId?: number | string;
+  vehicleRegNumber?: string;
+  status?: string;
+  fare?: number | string;
+  goodsType?: string;
+}
+
 const AddTrip = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
+  const { mode, tripId } = route.params || {};
+  const isEditMode = mode === 'edit' && !!tripId;
 
   // Form fields
   const [date, setDate] = useState('');
@@ -56,8 +76,6 @@ const AddTrip = () => {
   // Dropdown states
   const [showVehicleDropdown, setShowVehicleDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  const [showDriverDropdown, setShowDriverDropdown] = useState(false);
-  const [showHelperDropdown, setShowHelperDropdown] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Date picker states
@@ -80,6 +98,61 @@ const AddTrip = () => {
     { id: 'cancelled', name: 'Cancelled' },
   ];
 
+  const syncDatePicker = useCallback((dateValue?: string) => {
+    if (!dateValue) return;
+
+    const parsedDate = new Date(dateValue);
+    if (Number.isNaN(parsedDate.getTime())) return;
+
+    setSelectedYear(parsedDate.getFullYear());
+    setSelectedMonth(parsedDate.getMonth() + 1);
+    setSelectedDay(parsedDate.getDate());
+    setSelectedHour(parsedDate.getHours());
+    setSelectedMinute(parsedDate.getMinutes());
+  }, []);
+
+  const populateTripForm = useCallback((trip: TripDetail) => {
+    const vehicleIdValue = trip.vehicleId?.toString() || '';
+    const driverIdValue = trip.driverId?.toString() || '';
+    const helperIdValue = trip.helperId?.toString() || '';
+
+    setDate(trip.date || '');
+    setPickupDest(trip.pickupDest || '');
+    setDropDest(trip.dropDest || '');
+    setClientName(trip.clientName || '');
+    setClientContact(trip.clientContact || '');
+    setVehicleId(vehicleIdValue);
+    setDriverId(driverIdValue);
+    setHelperId(helperIdValue);
+    setStatus(trip.status?.toLowerCase() || '');
+    setFare(trip.fare?.toString() || '');
+    setGoodsType(trip.goodsType || '');
+    syncDatePicker(trip.date);
+
+    if (driverIdValue || trip.driverName) {
+      setDrivers([
+        { id: driverIdValue, name: trip.driverName || driverIdValue },
+      ]);
+    }
+
+    if (helperIdValue || trip.helperName) {
+      setHelpers([
+        { id: helperIdValue, name: trip.helperName || helperIdValue },
+      ]);
+    }
+
+    if (vehicleIdValue && trip.vehicleRegNumber) {
+      setVehicles(currentVehicles => {
+        const exists = currentVehicles.some(item => item.id === vehicleIdValue);
+        if (exists) return currentVehicles;
+        return [
+          ...currentVehicles,
+          { id: vehicleIdValue, name: trip.vehicleRegNumber || vehicleIdValue },
+        ];
+      });
+    }
+  }, [syncDatePicker]);
+
   // Fetch vehicles and initial data
   useEffect(() => {
     const fetchData = async () => {
@@ -87,20 +160,30 @@ const AddTrip = () => {
         setLoadingData(true);
         const vehiclesRes = await apiClient.get('/vehicles');
         const vehiclesData = vehiclesRes.data.map((vehicle: any) => ({
-          id: vehicle.id,
+          id: vehicle.id.toString(),
           name: vehicle.regNumber,
         }));
         setVehicles(vehiclesData);
+
+        if (isEditMode) {
+          const tripRes = await apiClient.get(`/trips/details/${tripId}`);
+          populateTripForm(tripRes.data);
+        }
       } catch (error) {
         console.log('Error fetching data:', error);
-        showToast({ message: 'Failed to load vehicles', type: 'error' });
+        showToast({
+          message: isEditMode
+            ? 'Failed to load trip details'
+            : 'Failed to load vehicles',
+          type: 'error',
+        });
       } finally {
         setLoadingData(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [isEditMode, populateTripForm, showToast, tripId]);
 
   // Fetch crew when vehicle is selected
   const handleVehicleSelect = async (vehicleIdSelected: string) => {
@@ -199,8 +282,8 @@ const AddTrip = () => {
     return true;
   };
 
-  // Handle add trip
-  const handleAddTrip = async () => {
+  // Handle add or update trip
+  const handleSaveTrip = async () => {
     if (!validateForm()) return;
 
     try {
@@ -220,16 +303,26 @@ const AddTrip = () => {
         goodsType: goodsType.trim(),
       };
 
-      console.log('Sending trip data:', JSON.stringify(tripData, null, 2));
-      await apiClient.post('/trips', tripData);
+      if (isEditMode) {
+        await apiClient.put(`/trips/${tripId}`, tripData);
+      } else {
+        await apiClient.post('/trips', tripData);
+      }
 
-      showToast({ message: 'Trip added successfully!', type: 'success' });
+      showToast({
+        message: isEditMode
+          ? 'Trip updated successfully!'
+          : 'Trip added successfully!',
+        type: 'success',
+      });
       navigation.goBack();
     } catch (error: any) {
-      console.log('Error adding trip:', error);
+      console.log('Error saving trip:', error);
       console.log('Error response:', error?.response?.data);
       showToast({
-        message: error?.response?.data?.message || 'Failed to add trip',
+        message:
+          error?.response?.data?.message ||
+          (isEditMode ? 'Failed to update trip' : 'Failed to add trip'),
         type: 'error',
       });
     } finally {
@@ -247,7 +340,7 @@ const AddTrip = () => {
 
   return (
     <SafeAreaView style={[container, { paddingBottom: s(10) }]}>
-      <CommonHeader title="Add Trip" />
+      <CommonHeader title={isEditMode ? 'Edit Trip' : 'Add Trip'} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -365,14 +458,14 @@ const AddTrip = () => {
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.button, loading && { opacity: 0.6 }]}
-              onPress={handleAddTrip}
+              onPress={handleSaveTrip}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator size="small" color={AppColors.primaryColor} />
               ) : (
                 <AppText variant="bold" style={styles.buttonText}>
-                  Add Trip
+                  {isEditMode ? 'Update Trip' : 'Add Trip'}
                 </AppText>
               )}
             </TouchableOpacity>
@@ -381,7 +474,7 @@ const AddTrip = () => {
       </KeyboardAvoidingView>
 
       {/* Vehicle Dropdown Modal */}
-      <Modal visible={showVehicleDropdown} transparent animationType="fade">
+      <Modal visible={showVehicleDropdown} transparent animationType="slide">
         <TouchableOpacity
           style={styles.modalOverlay}
           onPress={() => setShowVehicleDropdown(false)}
@@ -404,7 +497,7 @@ const AddTrip = () => {
       </Modal>
 
       {/* Status Dropdown Modal */}
-      <Modal visible={showStatusDropdown} transparent animationType="fade">
+      <Modal visible={showStatusDropdown} transparent animationType="slide">
         <TouchableOpacity
           style={styles.modalOverlay}
           onPress={() => setShowStatusDropdown(false)}
@@ -430,7 +523,7 @@ const AddTrip = () => {
       </Modal>
 
       {/* DateTime Picker Modal */}
-      <Modal visible={showDatePicker} transparent animationType="fade">
+      <Modal visible={showDatePicker} transparent animationType="slide">
         <TouchableOpacity
           style={styles.modalOverlay}
           onPress={() => setShowDatePicker(false)}
@@ -620,7 +713,8 @@ const styles = StyleSheet.create({
     color: AppColors.textColor,
     marginBottom: s(4),
     marginTop: s(14),
-    fontSize: s(14),
+    fontSize: s(15),
+    fontWeight: 'bold',
   },
   dropdownButton: {
     flexDirection: 'row',

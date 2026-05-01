@@ -1,62 +1,100 @@
-import { FlatList, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import React, { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  StyleSheet,
+  View,
+  TouchableOpacity,
+} from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
 import AppText from '../../components/AppText';
 import AppHeader from '../../components/AppHeader';
 import { container } from '../../constants/container';
 import AllTripsCard from '../../components/trips/AllTripsCard';
 import AppInput from '../../components/AppInput';
-import { useNavigation } from '@react-navigation/native';
-import TripDetails from './TripDetails';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus } from 'lucide-react-native';
 import { AppColors } from '../../styles/colors';
 import { scale as s } from 'react-native-size-matters';
+import apiClient from '../../api/api';
+import { useToast } from '../../components/Toast/ToastContext';
+
+type Trip = {
+  id?: string | number;
+  tripUID?: string;
+  tripUid?: string;
+  date?: string;
+  time?: string;
+  vehicleRegNumber?: string;
+  vehicleName?: string;
+  vehicle?: {
+    regNumber?: string;
+    name?: string;
+  };
+  vehicleId?: string | number;
+};
+
+const getTripUid = (trip: Trip) =>
+  trip.tripUID || trip.tripUid || trip.id?.toString() || '';
+
+const getVehicleName = (trip: Trip) =>
+  trip.vehicleRegNumber ||
+  trip.vehicleName ||
+  trip.vehicle?.regNumber ||
+  trip.vehicle?.name ||
+  trip.vehicleId?.toString() ||
+  'N/A';
+
+const getTripDate = (trip: Trip) => {
+  if (!trip.date) return '';
+  return trip.date.split('T')[0];
+};
+
+const getTripTime = (trip: Trip) => {
+  if (trip.time) return trip.time;
+  if (!trip.date || !trip.date.includes('T')) return '';
+
+  return new Date(trip.date).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 const TripList = () => {
   const navigation = useNavigation<any>();
+  const { showToast } = useToast();
   const [searchText, setSearchText] = useState('');
-  const tripDetails = [
-    {
-      tripUID: 'TRP-2023001',
-      date: '2023-10-26',
-      time: '09:30 AM',
-      vehicleName: 'ABC 123',
-    },
-    {
-      tripUID: 'TRP-2023002',
-      date: '2023-10-27',
-      time: '11:00 AM',
-      vehicleName: 'DEF 456',
-    },
-    {
-      tripUID: 'TRP-2023003',
-      date: '2023-10-28',
-      time: '02:15 PM',
-      vehicleName: 'GHI 789',
-    },
-    {
-      tripUID: 'TRP-2023004',
-      date: '2023-10-29',
-      time: '08:45 AM',
-      vehicleName: 'JKL 321',
-    },
-    {
-      tripUID: 'TRP-2023005',
-      date: '2023-10-30',
-      time: '04:30 PM',
-      vehicleName: 'MNO 654',
-    },
-    {
-      tripUID: 'TRP-2023006',
-      date: '2023-10-31',
-      time: '10:00 AM',
-      vehicleName: 'PQR 987',
-    },
-  ];
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
 
-  const handleTripClick = (tripUid: any) => {
+  const fetchTrips = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/trips');
+      const tripsData = Array.isArray(response.data)
+        ? response.data
+        : response.data?.data || [];
+      setTrips(tripsData);
+    } catch (error) {
+      console.log('Error fetching trips:', error);
+      showToast({ message: 'Failed to load trips', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchTrips();
+    }, [fetchTrips]),
+  );
+
+  const handleTripClick = (trip: Trip) => {
     navigation.navigate('TripDetails', {
-      selectedTripId: tripUid,
+      selectedTripId: trip.id?.toString() || getTripUid(trip),
     });
   };
 
@@ -64,22 +102,119 @@ const TripList = () => {
     navigation.navigate('AddTrip');
   };
 
+  const handleEditTrip = (trip: Trip) => {
+    navigation.navigate('AddTrip', {
+      mode: 'edit',
+      tripId: trip.id?.toString() || getTripUid(trip),
+    });
+  };
+
+  const openDeleteConfirm = (trip: Trip) => {
+    setTripToDelete(trip);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (!deleting) {
+      setTripToDelete(null);
+    }
+  };
+
+  const handleDeleteTrip = async () => {
+    if (!tripToDelete) return;
+
+    const tripId = tripToDelete.id?.toString() || getTripUid(tripToDelete);
+    if (!tripId) {
+      showToast({ message: 'Trip id not found', type: 'error' });
+      setTripToDelete(null);
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      await apiClient.delete(`/trips/${tripId}`);
+      setTrips(currentTrips =>
+        currentTrips.filter(item => (item.id?.toString() || getTripUid(item)) !== tripId),
+      );
+      setTripToDelete(null);
+      showToast({ message: 'Trip deleted successfully', type: 'success' });
+    } catch (error: any) {
+      console.log('Error deleting trip:', error);
+      showToast({
+        message: error?.response?.data?.message || 'Failed to delete trip',
+        type: 'error',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const filteredData = useMemo(() => {
-    let data = tripDetails;
+    let data = trips;
 
     if (searchText.trim() !== '') {
       data = data.filter(item =>
-        item.tripUID.toLowerCase().includes(searchText.toLowerCase()),
+        getTripUid(item).toLowerCase().includes(searchText.toLowerCase()),
       );
     }
 
     return data;
-  }, [searchText, tripDetails]);
+  }, [searchText, trips]);
+
+  if (loading) {
+    return (
+      <>
+        <AppHeader title="Trips" />
+        <View style={[container, styles.centerContent]}>
+          <ActivityIndicator size="large" color={AppColors.secondaryColor} />
+        </View>
+      </>
+    );
+  }
 
   return (
     <>
       <AppHeader title="Trips" />
       <SafeAreaView style={container} edges={['bottom']}>
+        <Modal
+          visible={!!tripToDelete}
+          transparent
+          animationType="fade"
+          onRequestClose={closeDeleteConfirm}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.confirmModal}>
+              <AppText variant="bold" style={styles.confirmTitle}>
+                Delete Trip?
+              </AppText>
+              <AppText style={styles.confirmMessage}>
+                Are you sure you want to delete trip{' '}
+                {tripToDelete ? getTripUid(tripToDelete) : ''}?
+              </AppText>
+              <View style={styles.confirmActions}>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.cancelButton]}
+                  onPress={closeDeleteConfirm}
+                  disabled={deleting}
+                >
+                  <AppText style={styles.cancelButtonText}>Cancel</AppText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.deleteConfirmButton]}
+                  onPress={handleDeleteTrip}
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <ActivityIndicator size="small" color={AppColors.textColor} />
+                  ) : (
+                    <AppText variant="bold" style={styles.deleteButtonText}>
+                      Delete
+                    </AppText>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
         <AppInput
           type="search"
           placeholder="Search Trip..."
@@ -87,14 +222,16 @@ const TripList = () => {
         />
         <FlatList
           data={filteredData}
-          keyExtractor={item => item.tripUID.toString()}
+          keyExtractor={(item, index) => getTripUid(item) || index.toString()}
           renderItem={({ item }) => (
             <AllTripsCard
-              tripUID={item.tripUID}
-              date={item.date}
-              time={item.time}
-              vehicleName={item.vehicleName}
-              onPress={() => handleTripClick(item.tripUID)}
+              tripUID={getTripUid(item)}
+              date={getTripDate(item)}
+              time={getTripTime(item)}
+              vehicleName={getVehicleName(item)}
+              onPress={() => handleTripClick(item)}
+              onEditPress={() => handleEditTrip(item)}
+              onDeletePress={() => openDeleteConfirm(item)}
             />
           )}
           showsVerticalScrollIndicator={false}
@@ -103,8 +240,12 @@ const TripList = () => {
               <View style={styles.noDataFound}>
                 <AppText>No Result Found!!</AppText>
               </View>
-            ): (
-              null
+            ) : (
+              <View style={styles.noDataFound}>
+                <AppText style={styles.emptyText}>
+                  No trips found. Add one to get started!
+                </AppText>
+              </View>
             )
           }
         />
@@ -125,14 +266,69 @@ const TripList = () => {
 export default TripList;
 
 const styles = StyleSheet.create({
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   noDataFound: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  emptyText: {
+    fontSize: s(16),
+    color: AppColors.textColor,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: s(20),
+  },
+  confirmModal: {
+    width: '100%',
+    backgroundColor: AppColors.cardColor,
+    borderRadius: s(10),
+    padding: s(18),
+  },
+  confirmTitle: {
+    fontSize: s(18),
+    marginBottom: s(8),
+  },
+  confirmMessage: {
+    fontSize: s(13),
+    color: '#bcc0c9',
+    marginBottom: s(18),
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: s(10),
+  },
+  confirmButton: {
+    minWidth: s(90),
+    height: s(40),
+    borderRadius: s(6),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+    borderColor: AppColors.inputColor,
+  },
+  cancelButtonText: {
+    color: AppColors.textColor,
+  },
+  deleteConfirmButton: {
+    backgroundColor: AppColors.tripStatusCancelled,
+  },
+  deleteButtonText: {
+    color: AppColors.textColor,
+  },
   fab: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 60,
     right: 30,
     width: 60,
     height: 60,

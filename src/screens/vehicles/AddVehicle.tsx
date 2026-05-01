@@ -221,7 +221,6 @@ const AddVehicle = () => {
       );
 
       const vehicleData = {
-        id: `VEH-${Date.now()}`,
         regNumber: regNumber.trim(),
         vehicleSize,
         capacity: capacity.trim(),
@@ -409,7 +408,7 @@ const AddVehicle = () => {
       </KeyboardAvoidingView>
 
       {/* Size Dropdown Modal */}
-      <Modal visible={showSizeDropdown} transparent animationType="fade">
+      <Modal visible={showSizeDropdown} transparent animationType="slide">
         <TouchableOpacity
           style={styles.modalOverlay}
           onPress={() => setShowSizeDropdown(false)}
@@ -435,7 +434,7 @@ const AddVehicle = () => {
       </Modal>
 
       {/* Driver Dropdown Modal */}
-      <Modal visible={showDriverDropdown} transparent animationType="fade">
+      <Modal visible={showDriverDropdown} transparent animationType="slide">
         <TouchableOpacity
           style={styles.modalOverlay}
           onPress={() => setShowDriverDropdown(false)}
@@ -461,7 +460,7 @@ const AddVehicle = () => {
       </Modal>
 
       {/* Helper Dropdown Modal */}
-      <Modal visible={showHelperDropdown} transparent animationType="fade">
+      <Modal visible={showHelperDropdown} transparent animationType="slide">
         <TouchableOpacity
           style={styles.modalOverlay}
           onPress={() => setShowHelperDropdown(false)}
@@ -487,7 +486,7 @@ const AddVehicle = () => {
       </Modal>
 
       {/* Date Picker Modal */}
-      <Modal visible={showDatePicker} transparent animationType="fade">
+      <Modal visible={showDatePicker} transparent animationType="slide">
         <TouchableOpacity
           style={styles.modalOverlay}
           onPress={() => setShowDatePicker(false)}

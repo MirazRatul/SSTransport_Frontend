@@ -1,5 +1,6 @@
 import {
   Alert,
+  ActivityIndicator,
   Image,
   Linking,
   ScrollView,
@@ -7,20 +8,95 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { AppColors } from '../../styles/colors';
 import { scale as s, vs } from 'react-native-size-matters';
 import AppText from '../../components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { container } from '../../constants/container';
 import CommonHeader from '../../components/CommonHeader';
-import AppButton from '../../components/AppButton';
-import { Phone, MessageSquare } from 'lucide-react-native';
+import { Phone, MessageSquare, User } from 'lucide-react-native';
+import apiClient from '../../api/api';
+import { useFocusEffect } from '@react-navigation/native';
+
+interface Employee {
+  id?: string | number;
+  name?: string;
+  image?: string;
+  contact?: string;
+  nidNo?: string;
+  nidPic?: string;
+  role?: string;
+  drivingLicenseNo?: string | null;
+  drivingLicenseImg?: string | null;
+}
+
+const normalizeEmployeeResponse = (data: any): Employee | null => {
+  if (!data) return null;
+  if (data?.data && !Array.isArray(data.data)) return data.data;
+  return data;
+};
 
 const EmployeeDetails = ({ route }: any) => {
-  const { selectedEmployee } = route.params;
+  const { selectedEmployee, employeeId } = route.params || {};
+  const [employee, setEmployee] = useState<Employee | null>(
+    selectedEmployee || null,
+  );
+  const [loading, setLoading] = useState(!selectedEmployee && !!employeeId);
 
-  if (!selectedEmployee) {
+  const fetchEmployeeDetails = useCallback(async () => {
+    if (!employeeId) return;
+
+    try {
+      setLoading(true);
+      const response = await apiClient.get(`/employees/${employeeId}`);
+      const employeeData = normalizeEmployeeResponse(response.data);
+
+      if (employeeData) {
+        setEmployee(employeeData);
+        return;
+      }
+    } catch (error) {
+      console.log('Error fetching employee details:', error);
+
+      try {
+        const response = await apiClient.get('/employees');
+        const employeesData = Array.isArray(response.data)
+          ? response.data
+          : response.data?.data || [];
+        const matchedEmployee = employeesData.find(
+          (item: Employee) => item.id?.toString() === employeeId?.toString(),
+        );
+
+        if (matchedEmployee) {
+          setEmployee(matchedEmployee);
+        }
+      } catch (fallbackError) {
+        console.log('Error fetching employee list:', fallbackError);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [employeeId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchEmployeeDetails();
+    }, [fetchEmployeeDetails]),
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={container}>
+        <CommonHeader title="Employee Details" />
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={AppColors.secondaryColor} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!employee) {
     return (
       <SafeAreaView style={container}>
         <CommonHeader title="Employee Details" />
@@ -32,12 +108,12 @@ const EmployeeDetails = ({ route }: any) => {
   }
 
   const handleCall = async () => {
-    if (!selectedEmployee.contact) {
+    if (!employee.contact) {
       Alert.alert('Error', 'Contact number not available');
       return;
     }
     try {
-      await Linking.openURL(`tel:${selectedEmployee.contact}`);
+      await Linking.openURL(`tel:${employee.contact}`);
     } catch (error) {
       Alert.alert('Error', 'Unable to make call');
       console.error('Call error:', error);
@@ -52,15 +128,18 @@ const EmployeeDetails = ({ route }: any) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.nameSection}>
-          <Image
-            source={{ uri: selectedEmployee.image }}
-            style={styles.image}
-          />
+          {employee.image ? (
+            <Image source={{ uri: employee.image }} style={styles.image} />
+          ) : (
+            <View style={[styles.image, styles.imagePlaceholder]}>
+              <User size={s(34)} color={AppColors.textColor} />
+            </View>
+          )}
           <AppText style={{ fontSize: s(20) }} variant="bold">
-            {selectedEmployee.name}
+            {employee.name || 'N/A'}
           </AppText>
           <AppText style={{ fontSize: s(13) }}>
-            {selectedEmployee.role}
+            {employee.role || 'N/A'}
           </AppText>
         </View>
         <View style={styles.separator} />
@@ -102,45 +181,45 @@ const EmployeeDetails = ({ route }: any) => {
         <View style={styles.employeeInfoContainer}>
           <View style={styles.info}>
             <AppText style={styles.infoTextTitle}>Employee ID</AppText>
-            <AppText style={styles.infoText}>{selectedEmployee.id}</AppText>
+            <AppText style={styles.infoText}>{employee.id || 'N/A'}</AppText>
             <View style={styles.separator} />
 
             <AppText style={styles.infoTextTitle}>Contact Number</AppText>
-            <AppText style={styles.infoText}>{selectedEmployee.contact}</AppText>
+            <AppText style={styles.infoText}>{employee.contact || 'N/A'}</AppText>
             <View style={styles.separator} />
 
             <AppText style={styles.infoTextTitle}>NID Number</AppText>
-            <AppText style={styles.infoText}>{selectedEmployee.nidNo}</AppText>
+            <AppText style={styles.infoText}>{employee.nidNo || 'N/A'}</AppText>
             <View style={styles.separator} />
 
             <AppText style={styles.infoTextTitle}>Role</AppText>
-            <AppText style={styles.infoText}>{selectedEmployee.role}</AppText>
+            <AppText style={styles.infoText}>{employee.role || 'N/A'}</AppText>
             <View style={styles.separator} />
 
             <AppText style={styles.infoTextTitle}>Driving License</AppText>
             <AppText style={styles.infoText}>
-              {selectedEmployee.drivingLicenseNo || 'N/A'}
+              {employee.drivingLicenseNo || 'N/A'}
             </AppText>
           </View>
         </View>
-        {selectedEmployee.nidPic && (
+        {employee.nidPic && (
           <View style={styles.nidContainer}>
             <AppText style={{ fontSize: s(16) }} variant="bold">
               NID Document
             </AppText>
             <Image
-              source={{ uri: selectedEmployee.nidPic }}
+              source={{ uri: employee.nidPic }}
               style={styles.nidImage}
             />
           </View>
         )}
-        {selectedEmployee.drivingLicenseImg && (
+        {employee.drivingLicenseImg && (
           <View style={styles.nidContainer}>
             <AppText style={{ fontSize: s(16) }} variant="bold">
               Driving License
             </AppText>
             <Image
-              source={{ uri: selectedEmployee.drivingLicenseImg }}
+              source={{ uri: employee.drivingLicenseImg }}
               style={styles.nidImage}
             />
           </View>
@@ -200,6 +279,11 @@ const styles = StyleSheet.create({
     width: s(80),
     borderRadius: s(40),
     marginBottom: vs(10),
+  },
+  imagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: AppColors.inputColor,
   },
   employeeInfoContainer: {
     justifyContent: 'flex-start',

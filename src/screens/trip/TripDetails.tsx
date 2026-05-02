@@ -8,7 +8,7 @@ import { scale as s, vs } from 'react-native-size-matters';
 import { AppColors } from '../../styles/colors';
 import TripDetailsCards from '../../components/trips/TripDetailsCards';
 import apiClient from '../../api/api';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useToast } from '../../components/Toast/ToastContext';
 
 interface TripDetail {
@@ -18,28 +18,41 @@ interface TripDetail {
   dropDest?: string;
   clientName?: string;
   clientContact?: string;
+  driverId?: string | number;
   driverName?: string;
   driverRole?: string;
   driverImage?: string;
+  helperId?: string | number;
   helperName?: string;
   helperRole?: string;
   helperImage?: string;
+  driver?: PersonnelInfo;
+  helper?: PersonnelInfo;
   vehicleRegNumber?: string;
   status?: string;
   fare?: number | string;
   goodsType?: string;
 }
 
+type PersonnelInfo = {
+  id?: string | number;
+  name?: string;
+  role?: string;
+  image?: string;
+};
+
 const getDriverInfo = (trip: TripDetail) => ({
-  name: trip.driverName,
-  role: trip.driverRole,
-  image: trip.driverImage,
+  id: trip.driverId || trip.driver?.id,
+  name: trip.driverName || trip.driver?.name,
+  role: trip.driverRole || trip.driver?.role,
+  image: trip.driverImage || trip.driver?.image,
 });
 
 const getHelperInfo = (trip: TripDetail) => ({
-  name: trip.helperName,
-  role: trip.helperRole,
-  image: trip.helperImage,
+  id: trip.helperId || trip.helper?.id,
+  name: trip.helperName || trip.helper?.name,
+  role: trip.helperRole || trip.helper?.role,
+  image: trip.helperImage || trip.helper?.image,
 });
 
 const formatDate = (date?: string) => {
@@ -87,15 +100,22 @@ const getStatusColor = (status?: string) => {
 };
 
 const TripDetails = ({ route }: any) => {
-  const { selectedTripId } = route.params;
+  const navigation = useNavigation<any>();
+  const { selectedTripId, selectedTrip } = route.params || {};
   const { showToast } = useToast();
-  const [trip, setTrip] = useState<TripDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const tripId = selectedTripId || selectedTrip?.id?.toString();
+  const [trip, setTrip] = useState<TripDetail | null>(selectedTrip || null);
+  const [loading, setLoading] = useState(!selectedTrip);
 
   const fetchTripDetails = useCallback(async () => {
+    if (!tripId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await apiClient.get(`/trips/details/${selectedTripId}`);
+      const response = await apiClient.get(`/trips/details/${tripId}`);
       setTrip(response.data);
     } catch (error) {
       console.log('Error fetching trip details:', error);
@@ -103,7 +123,7 @@ const TripDetails = ({ route }: any) => {
     } finally {
       setLoading(false);
     }
-  }, [selectedTripId, showToast]);
+  }, [tripId, showToast]);
 
   useFocusEffect(
     useCallback(() => {
@@ -136,6 +156,17 @@ const TripDetails = ({ route }: any) => {
   const driverInfo = getDriverInfo(trip);
   const helperInfo = getHelperInfo(trip);
   const statusColor = getStatusColor(trip.status);
+  const handlePersonnelPress = (person: PersonnelInfo) => {
+    navigation.navigate('EmployeeDetails', {
+      employeeId: person.id?.toString(),
+      selectedEmployee: {
+        id: person.id,
+        name: person.name,
+        role: person.role,
+        image: person.image,
+      },
+    });
+  };
 
   return (
     <SafeAreaView style={container}>
@@ -186,6 +217,7 @@ const TripDetails = ({ route }: any) => {
             driverInfo,
             helperInfo,
           ]}
+          onPersonnelPress={handlePersonnelPress}
         />
         <TripDetailsCards
           title="Logistics"

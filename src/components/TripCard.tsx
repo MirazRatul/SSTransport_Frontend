@@ -1,21 +1,20 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import React from 'react';
 import { scale as s } from 'react-native-size-matters';
 import { AppColors } from '../styles/colors';
 import { Truck, ArrowRight } from 'lucide-react-native';
 import AppText from './AppText';
 import AppButton from './AppButton';
-import { useToast } from './Toast/ToastContext';
 
 interface TripCardProps {
   tripId: string;
   status: string;
   from: string;
   to: string;
-  time?: string;
-  date?: string;
+  dateTime?: string;
   vehicleId: string;
-  type?: 'active' | 'upcoming';
+  statusColor?: string;
+  onDetailsPress?: () => void;
 }
 
 const TripCard: React.FC<TripCardProps> = ({
@@ -23,16 +22,18 @@ const TripCard: React.FC<TripCardProps> = ({
   status,
   from,
   to,
-  time,
-  date,
-  type = 'active',
+  dateTime,
   vehicleId,
+  statusColor,
+  onDetailsPress = () => {},
 }) => {
-  const { showToast } = useToast();
+  const accentColor = statusColor || AppColors.secondaryColor;
+  const isActive = accentColor === AppColors.secondaryColor;
+
   return (
     <View style={[styles.tripContainer]}>
       <View style={styles.tripHeader}>
-        <Truck size={20} color={AppColors.secondaryColor} />
+        <Truck size={20} color={accentColor} />
         <View style={styles.tripIdContainer}>
           <AppText style={{ marginStart: s(10) }} variant="bold">
             {tripId}
@@ -42,24 +43,15 @@ const TripCard: React.FC<TripCardProps> = ({
           style={[
             styles.statusContainer,
             {
-              backgroundColor:
-                type === 'active'
-                  ? `${AppColors.secondaryColor}1A`
-                  : 'rgba(255,255,255,0.1)',
-              borderColor:
-                type === 'active'
-                  ? AppColors.secondaryColor
-                  : AppColors.textColor,
+              backgroundColor: `${accentColor}1A`,
+              borderColor: accentColor,
             },
           ]}
         >
           <AppText
             style={{
               fontSize: s(10),
-              color:
-                type === 'active'
-                  ? AppColors.secondaryColor
-                  : AppColors.textColor,
+              color: accentColor,
             }}
           >
             {status}
@@ -72,28 +64,19 @@ const TripCard: React.FC<TripCardProps> = ({
         <ArrowRight
           style={{ marginHorizontal: s(5) }}
           size={15}
-          color={AppColors.secondaryColor}
+          color={accentColor}
         />
         <AppText>{to}</AppText>
       </View>
-      {type === 'active' ? (
-        <>
-          <AppText style={{ fontSize: 13 }}>ETA:</AppText>
-          <AppText>{time}</AppText>
-        </>
-      ) : (
-        <>
-          <AppText style={{ fontSize: 13 }}>Scheduled :</AppText>
-          <AppText>{date}</AppText>
-        </>
-      )}
+      <AppText style={{ fontSize: 13 }}>Date and Time:</AppText>
+      <AppText>{dateTime || 'N/A'}</AppText>
 
       <AppText style={{ fontSize: 13, marginTop: s(10) }}>Vehicle</AppText>
       <View style={styles.vehicleIdContainer}>
         <AppText
           style={{
             fontSize: s(12),
-            color: AppColors.secondaryColor,
+            color: accentColor,
             marginHorizontal: s(5),
           }}
         >
@@ -103,23 +86,18 @@ const TripCard: React.FC<TripCardProps> = ({
       <AppButton
         textStyle={{
           fontSize: s(15),
-          color:
-            type === 'active'
-              ? AppColors.primaryColor
-              : AppColors.secondaryColor,
+          color: isActive ? AppColors.primaryColor : accentColor,
         }}
         btnStyle={[
           styles.btn,
           {
-            backgroundColor:
-              type === 'active' ? AppColors.secondaryColor : 'transparent',
-            borderColor:
-              type === 'active' ? 'transparent' : AppColors.secondaryColor,
-            borderWidth: type === 'active' ? 0 : 1,
+            backgroundColor: isActive ? accentColor : 'transparent',
+            borderColor: isActive ? 'transparent' : accentColor,
+            borderWidth: isActive ? 0 : 1,
           },
         ]}
         title="Details"
-        onPress={() => showToast({ message: 'On Going Feature', type: 'info' })}
+        onPress={onDetailsPress}
       />
     </View>
   );

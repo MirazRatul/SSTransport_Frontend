@@ -13,6 +13,7 @@ import { scale as s, vs } from 'react-native-size-matters';
 import { AppColors } from '../../styles/colors';
 
 interface Personnel {
+  id?: string | number;
   name?: string;
   role?: string;
   image?: string;
@@ -29,6 +30,7 @@ interface TripDetailsCardProps {
   callNumber?: string;
   type?: string;
   personnel?: Personnel[];
+  onPersonnelPress?: (person: Personnel) => void;
 }
 
 const TripDetailsCards = ({
@@ -42,6 +44,7 @@ const TripDetailsCards = ({
   callNumber,
   type,
   personnel,
+  onPersonnelPress,
 }: TripDetailsCardProps) => {
   const handleCall = async () => {
     if (!callNumber) {
@@ -94,9 +97,11 @@ const TripDetailsCards = ({
           </>
         ) : null}
         {personnel?.map((item, index) => (
-          <View
+          <TouchableOpacity
             key={`${item.role || 'person'}-${index}`}
             style={styles.personRow}
+            onPress={() => onPersonnelPress?.(item)}
+            disabled={!onPersonnelPress}
           >
             {item.image ? (
               <Image source={{ uri: item.image }} style={styles.personImage} />
@@ -111,7 +116,7 @@ const TripDetailsCards = ({
               </AppText>
               <AppText style={styles.personRole}>{item.role || 'N/A'}</AppText>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
       {type === 'client' ? (

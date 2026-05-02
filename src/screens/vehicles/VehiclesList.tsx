@@ -1,6 +1,5 @@
-import { FlatList, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlatList, StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import AppText from '../../components/AppText';
 import { container } from '../../constants/container';
 import AppHeader from '../../components/AppHeader';
@@ -11,6 +10,7 @@ import { AppColors } from '../../styles/colors';
 import apiClient from '../../api/api';
 import { scale as s } from 'react-native-size-matters';
 import { useToast } from '../../components/Toast/ToastContext';
+import AppInput from '../../components/AppInput';
 
 type Vehicle = {
   id: string;
@@ -28,11 +28,12 @@ type Vehicle = {
 const VehiclesList = () => {
   const navigation = useNavigation<any>();
   const { showToast } = useToast();
+  const [searchText, setSearchText] = useState('');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch vehicles from API
-  const fetchVehicles = async () => {
+  const fetchVehicles = useCallback(async () => {
     try {
       setLoading(true);
       const response = await apiClient.get('/vehicles');
@@ -43,18 +44,18 @@ const VehiclesList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   // Fetch vehicles on component mount
   useEffect(() => {
     fetchVehicles();
-  }, []);
+  }, [fetchVehicles]);
 
   // Refresh vehicles when screen is focused (returning from AddVehicle)
   useFocusEffect(
     React.useCallback(() => {
       fetchVehicles();
-    }, [])
+    }, [fetchVehicles])
   );
 
   const navigateToDetails = (vehicle: Vehicle) => {
@@ -67,11 +68,29 @@ const VehiclesList = () => {
     navigation.navigate('AddVehicle');
   };
 
+  const filteredVehicles = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+
+    if (!query) return vehicles;
+
+    return vehicles.filter(vehicle =>
+      [
+        vehicle.regNumber,
+        vehicle.vehicleSize,
+        vehicle.capacity,
+        vehicle.assignedDriver,
+        vehicle.assignedHelper,
+      ]
+        .filter(Boolean)
+        .some(value => String(value).toLowerCase().includes(query)),
+    );
+  }, [searchText, vehicles]);
+
   if (loading) {
     return (
       <>
         <AppHeader title="Vehicles" />
-        <View style={[container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <View style={[container, styles.centerContent]}>
           <ActivityIndicator size="large" color={AppColors.secondaryColor} />
         </View>
       </>
@@ -82,15 +101,32 @@ const VehiclesList = () => {
     <>
       <AppHeader title="Vehicles" />
       <View style={container}>
-        {vehicles.length === 0 ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={styles.searchRow}>
+          <AppInput
+            type="search"
+            placeholder="Search Vehicle..."
+            onChangeText={setSearchText}
+            containerStyle={styles.searchInput}
+          />
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={handleAddVehicle}
+            activeOpacity={0.7}
+          >
+            <Plus size={s(24)} color={AppColors.textColor} />
+          </TouchableOpacity>
+        </View>
+        {filteredVehicles.length === 0 ? (
+          <View style={styles.centerContent}>
             <AppText style={{ fontSize: s(16), color: AppColors.textColor }}>
-              No vehicles found. Add one to get started!
+              {searchText.length > 0
+                ? 'No Result Found!!'
+                : 'No vehicles found. Add one to get started!'}
             </AppText>
           </View>
         ) : (
           <FlatList
-            data={vehicles}
+            data={filteredVehicles}
             keyExtractor={item => item.id.toString()}
             renderItem={({ item }) => (
               <VehiclesCard
@@ -106,15 +142,6 @@ const VehiclesList = () => {
           />
         )}
       </View>
-      
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleAddVehicle}
-        activeOpacity={0.7}
-      >
-        <Plus size={28} color={AppColors.textColor} />
-      </TouchableOpacity>
     </>
   );
 };
@@ -122,21 +149,27 @@ const VehiclesList = () => {
 export default VehiclesList;
 
 const styles = StyleSheet.create({
-  fab: {
-    position: 'absolute',
-    bottom: 30,
-    right: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: AppColors.secondaryColor,
-    opacity: 0.9,
+  centerContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(10),
+    marginBottom: s(10),
+  },
+  searchInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  addButton: {
+    width: s(40),
+    height: s(40),
+    borderRadius: s(20),
+    backgroundColor: AppColors.secondaryColor,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

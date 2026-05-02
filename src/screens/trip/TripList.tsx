@@ -215,11 +215,21 @@ const TripList = () => {
             </View>
           </View>
         </Modal>
-        <AppInput
-          type="search"
-          placeholder="Search Trip..."
-          onChangeText={setSearchText}
-        />
+        <View style={styles.searchRow}>
+          <AppInput
+            type="search"
+            placeholder="Search Trip..."
+            onChangeText={setSearchText}
+            containerStyle={styles.searchInput}
+          />
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={handleAddTrip}
+            activeOpacity={0.7}
+          >
+            <Plus size={s(24)} color={AppColors.textColor} />
+          </TouchableOpacity>
+        </View>
         <FlatList
           data={filteredData}
           keyExtractor={(item, index) => getTripUid(item) || index.toString()}
@@ -250,15 +260,6 @@ const TripList = () => {
           }
         />
       </SafeAreaView>
-
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleAddTrip}
-        activeOpacity={0.7}
-      >
-        <Plus size={28} color={AppColors.textColor} />
-      </TouchableOpacity>
     </>
   );
 };
@@ -278,6 +279,24 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: s(16),
     color: AppColors.textColor,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(10),
+    marginBottom: s(10),
+  },
+  searchInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  addButton: {
+    width: s(40),
+    height: s(40),
+    borderRadius: s(5),
+    backgroundColor: AppColors.secondaryColor,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalOverlay: {
     flex: 1,
@@ -325,22 +344,5 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: AppColors.textColor,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 60,
-    right: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: AppColors.secondaryColor,
-    opacity: 0.9,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
   },
 });

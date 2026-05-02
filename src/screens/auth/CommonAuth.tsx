@@ -2,6 +2,7 @@ import {
   StyleSheet,
   View,
   KeyboardAvoidingView,
+  ScrollView,
   TouchableWithoutFeedback,
   Keyboard,
   Platform,
@@ -20,12 +21,17 @@ const CommonAuth = () => {
   return (
     <SafeAreaView style={container}>
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <View style={styles.loginContainer}>
+          <ScrollView
+            contentContainerStyle={styles.loginContainer}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentInsetAdjustmentBehavior="never"
+          >
             <View style={styles.btnContainer}>
               <AppButton
                 btnStyle={[
@@ -77,7 +83,7 @@ const CommonAuth = () => {
             ) : (
               <SignUp onGoToSignIn={() => setActiveTab('login')} />
             )}
-          </View>
+          </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -87,10 +93,14 @@ const CommonAuth = () => {
 export default CommonAuth;
 
 const styles = StyleSheet.create({
-  loginContainer: {
+  keyboardAvoidingView: {
     flex: 1,
+  },
+  loginContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: vs(15),
   },
   btnContainer: {
     flexDirection: 'row',

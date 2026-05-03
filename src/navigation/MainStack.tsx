@@ -1,6 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import BottomTab from './BottomTab';
 import AuthStack from './AuthStack';
 import auth from '@react-native-firebase/auth';
 import BootSplash from 'react-native-bootsplash';
@@ -12,6 +11,7 @@ import DrawerStack from './DrawerStack';
 import TripDetails from '../screens/trip/TripDetails';
 import AddVehicle from '../screens/vehicles/AddVehicle';
 import AddTrip from '../screens/trip/AddTrip';
+import ChatScreen from '../screens/chat/ChatScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -36,7 +36,7 @@ const MainStack = () => {
           try {
             // reload to ensure emailVerified is up-to-date
             await currentUser.reload();
-          } catch (e) {
+          } catch {
             // ignore reload errors
           }
 
@@ -46,7 +46,7 @@ const MainStack = () => {
           setUser(null);
         }
 
-        if (initializing) setInitializing(false);
+        setInitializing(false);
       })();
     });
 
@@ -88,6 +88,7 @@ const MainStack = () => {
           <Stack.Screen name="AddVehicle" component={AddVehicle}/>
           <Stack.Screen name="AddTrip" component={AddTrip}/>
           <Stack.Screen name="TripDetails" component={TripDetails}/>
+          <Stack.Screen name="ChatScreen" component={ChatScreen}/>
         </>
       ) : (
         <Stack.Screen name="AuthStack" component={AuthStack} />

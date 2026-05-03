@@ -2,11 +2,23 @@ import { createDrawerNavigator } from '@react-navigation/drawer';
 import BottomTab from './BottomTab';
 import { scale as s } from 'react-native-size-matters';
 import { AppColors } from '../styles/colors';
-import { House, Van } from 'lucide-react-native';
-import Profile from '../screens/profile/Profile';
+import { House, MessageCircle, Van } from 'lucide-react-native';
 import TripList from '../screens/trip/TripList';
+import ChatList from '../screens/chat/ChatList';
 
 const AppDrawer = createDrawerNavigator();
+
+const HomeDrawerIcon = ({ color }: { color: string }) => (
+  <House size={s(20)} color={color}/>
+);
+
+const TripDrawerIcon = ({ color }: { color: string }) => (
+  <Van size={s(20)} color={color}/>
+);
+
+const ChatDrawerIcon = ({ color }: { color: string }) => (
+  <MessageCircle size={s(20)} color={color}/>
+);
 
 const DrawerStack = () => {
   return (
@@ -29,7 +41,8 @@ const DrawerStack = () => {
         name="BottomTab"
         component={BottomTab}
         options={{
-          drawerIcon: ({color}) => <House size={s(20)} color={color}/>, title: 'Home'
+          drawerIcon: HomeDrawerIcon,
+          title: 'Home'
           
         }}
       />
@@ -37,12 +50,16 @@ const DrawerStack = () => {
       name="Trip"
       component={TripList}
       options={{
-        drawerIcon: ({color}) => {
-          return(
-            <Van size={s(20)} color={color}/>
-          )
-        }
+        drawerIcon: TripDrawerIcon,
       }}
+      />
+      <AppDrawer.Screen
+        name="MyChat"
+        component={ChatList}
+        options={{
+          title: 'My Chat',
+          drawerIcon: ChatDrawerIcon,
+        }}
       />
     </AppDrawer.Navigator>
   );

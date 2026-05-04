@@ -5,6 +5,7 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   StyleSheet,
   TextInput,
@@ -18,7 +19,9 @@ import {
 } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
-import { Send, User } from 'lucide-react-native';
+import { Send, User, X, Image as ImageIcon } from 'lucide-react-native';
+import { launchImageLibrary, PhotoQuality } from 'react-native-image-picker';
+import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from '@env';
 import { scale as s, vs } from 'react-native-size-matters';
 import AppText from '../../components/AppText';
 import CommonHeader from '../../components/CommonHeader';
@@ -31,6 +34,13 @@ interface ChatMessage {
   senderId: string;
   receiverId: string;
   createdAt?: any;
+  imageUrl?: string;
+  replyTo?: {
+    messageId: string;
+    text: string;
+    senderName: string;
+    senderId: string;
+  };
 }
 
 const getChatId = (firstUserId: string, secondUserId: string) => {
@@ -47,6 +57,41 @@ const formatTime = (createdAt?: any) => {
   });
 };
 
+const formatMessageDate = (createdAt?: any) => {
+  const date = createdAt?.toDate?.();
+  if (!date) return '';
+
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const isToday = date.toDateString() === today.toDateString();
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  if (isToday) {
+    return 'Today';
+  }
+
+  if (isYesterday) {
+    return 'Yesterday';
+  }
+
+  const dayDifference = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (dayDifference < 7) {
+    return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+  }
+
+  // Check if same year
+  if (date.getFullYear() === today.getFullYear()) {
+    // Same year: show "Apr 19"
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } else {
+    // Different year: show "Apr 19, 2025"
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+};
+
 const ChatScreen = ({ route }: any) => {
   const { receiverId, receiverName, receiverImage, receiverRole } =
     route.params || {};
@@ -56,7 +101,11 @@ const ChatScreen = ({ route }: any) => {
   const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [receiverLastSeen, setReceiverLastSeen] = useState<number | null>(null); // ← NEW
+  const [receiverLastSeen, setReceiverLastSeen] = useState<number | null>(null);
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null);
 
   const conversationId = useMemo(() => {
     if (!currentUser?.uid || !receiverId) return null;
@@ -85,7 +134,6 @@ const ChatScreen = ({ route }: any) => {
             role: receiverRole || null,
           },
         },
-        updatedAt: firestore.FieldValue.serverTimestamp(),
       },
       { merge: true },
     );
@@ -177,10 +225,10 @@ const ChatScreen = ({ route }: any) => {
     return lastSeen?.id ?? null;
   }, [receiverLastSeen, messages, currentUser?.uid]);
 
-  const handleSend = async () => {
+  const handleSend = async (imageUrl?: string) => {
     const trimmedMessage = messageText.trim();
     if (
-      !trimmedMessage ||
+      (!trimmedMessage && !imageUrl) ||
       !conversationRef ||
       !currentUser?.uid ||
       !receiverId
@@ -196,18 +244,33 @@ const ChatScreen = ({ route }: any) => {
       const messageRef = conversationRef.collection('messages').doc();
       const batch = firestore().batch();
 
-      batch.set(messageRef, {
-        text: trimmedMessage,
+      const messageData: any = {
         senderId: currentUser.uid,
         receiverId,
         createdAt,
-      });
+      };
+
+      // Add text or image
+      if (trimmedMessage) messageData.text = trimmedMessage;
+      if (imageUrl) messageData.imageUrl = imageUrl;
+
+      // Add replyTo if replying to a message
+      if (replyingTo) {
+        messageData.replyTo = {
+          messageId: replyingTo.id,
+          text: replyingTo.text,
+          senderName: replyingTo.senderId === currentUser.uid ? 'You' : (receiverName || 'Admin'),
+          senderId: replyingTo.senderId,
+        };
+      }
+
+      batch.set(messageRef, messageData);
 
       batch.set(
         conversationRef,
         {
           participants: [currentUser.uid, receiverId],
-          lastMessage: trimmedMessage,
+          lastMessage: imageUrl ? '📷 Image' : trimmedMessage,
           lastMessageSenderId: currentUser.uid,
           updatedAt: createdAt,
         },
@@ -215,63 +278,170 @@ const ChatScreen = ({ route }: any) => {
       );
 
       await batch.commit();
+      setReplyingTo(null);
     } catch (error) {
       console.log('Send message error:', error);
-      setMessageText(trimmedMessage);
+      if (!imageUrl) setMessageText(trimmedMessage);
       Alert.alert('Message Error', 'Unable to send your message.');
     } finally {
       setSending(false);
     }
   };
 
-  const renderMessage = ({ item }: { item: ChatMessage }) => {
+  const handleReply = (message: ChatMessage) => {
+    setReplyingTo(message);
+  };
+
+  // ─── Upload to Cloudinary ───────────────────────────────────────────────────
+  const uploadToCloudinary = async (localUri: string, fileName: string): Promise<string> => {
+    const filename = fileName || localUri.split('/').pop() || 'chat_image.jpg';
+    const ext = filename.split('.').pop()?.toLowerCase() || 'jpg';
+    const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: localUri,
+      name: filename,
+      type: mimeType,
+    } as any);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    formData.append('folder', 'ChatImages');
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: 'POST', body: formData },
+    );
+    const json = await response.json();
+    if (!json.secure_url) throw new Error(json.error?.message || 'Cloudinary upload failed');
+    return json.secure_url;
+  };
+
+  // ─── Image Picker ───────────────────────────────────────────────────────────
+  const handleImagePicker = async () => {
+    const result = await launchImageLibrary({
+      mediaType: 'photo' as const,
+      maxWidth: 1000,
+      maxHeight: 1000,
+      quality: 0.8 as PhotoQuality,
+    });
+    if (result.assets && result.assets.length > 0) {
+      setSelectedImageUri(result.assets[0].uri || null);
+    }
+  };
+
+  // ─── Send image message ──────────────────────────────────────────────────────
+  const handleSendImage = async () => {
+    if (!selectedImageUri) return;
+
+    try {
+      setUploadingImage(true);
+      const imageUrl = await uploadToCloudinary(selectedImageUri, 'chat_image.jpg');
+      
+      // Send as message with image
+      await handleSend(imageUrl);
+      setSelectedImageUri(null);
+    } catch (error: any) {
+      console.log('Error uploading image:', error);
+      Alert.alert('Upload Error', error.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
     const isMine = item.senderId === currentUser?.uid;
-    const isLastSeen = isMine && item.id === lastSeenMessageId; // ← NEW
+    const isLastSeen = isMine && item.id === lastSeenMessageId;
+
+    // Check if next message (since list is inverted) is from a different date
+    const nextMessage = messages[index + 1];
+    const currentDate = item.createdAt?.toDate?.()?.toDateString?.();
+    const nextDate = nextMessage?.createdAt?.toDate?.()?.toDateString?.();
+    const showDateSeparator = currentDate !== nextDate;
 
     return (
-      <View
-        style={[
-          styles.messageRow,
-          isMine ? styles.myMessageRow : styles.theirMessageRow,
-        ]}
-      >
-        <View
-          style={[styles.bubble, isMine ? styles.myBubble : styles.theirBubble]}
-        >
-          <AppText
-            style={[
-              styles.messageText,
-              isMine ? styles.myMessageText : styles.theirMessageText,
-            ]}
-          >
-            {item.text}
-          </AppText>
-          <AppText
-            style={[
-              styles.timeText,
-              isMine ? styles.myTimeText : styles.theirTimeText,
-            ]}
-          >
-            {formatTime(item.createdAt)}
-          </AppText>
-        </View>
-
-        {/* ─── Seen avatar (like Messenger) ──────────────────────────────── */}
-        {isLastSeen && (
-          <View style={styles.seenAvatarWrapper}>
-            {receiverImage ? (
-              <Image
-                source={{ uri: receiverImage }}
-                style={styles.seenAvatar}
-              />
-            ) : (
-              <View style={[styles.seenAvatar, styles.seenAvatarPlaceholder]}>
-                <User size={s(9)} color={AppColors.textColor} />
-              </View>
-            )}
+      <>
+        {showDateSeparator && (
+          <View style={styles.dateSeparator}>
+            <AppText style={styles.dateSeparatorText}>
+              {formatMessageDate(item.createdAt)}
+            </AppText>
           </View>
         )}
-      </View>
+        <TouchableOpacity
+          style={[
+            styles.messageRow,
+            isMine ? styles.myMessageRow : styles.theirMessageRow,
+          ]}
+          onLongPress={() => handleReply(item)}
+          delayLongPress={200}
+        >
+          <View
+            style={[styles.bubble, isMine ? styles.myBubble : styles.theirBubble]}
+          >
+            {/* ─── Show quoted message if this is a reply ──────────────────────── */}
+            {item.replyTo && (
+              <View style={[styles.quotedMessage, isMine ? styles.quotedMessageMine : styles.quotedMessageTheir]}>
+                <AppText style={styles.quotedSenderName}>
+                  {item.replyTo.senderName}
+                </AppText>
+                <AppText
+                  style={styles.quotedText}
+                  numberOfLines={2}
+                >
+                  {item.replyTo.text}
+                </AppText>
+              </View>
+            )}
+
+            {/* ─── Display Image ──────────────────────────────────────────────── */}
+            {item.imageUrl && (
+              <TouchableOpacity onPress={() => setViewingImageUrl(item.imageUrl || '')}>
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={styles.messageImage}
+                />
+              </TouchableOpacity>
+            )}
+
+            {/* ─── Display Text ──────────────────────────────────────────────── */}
+            {item.text && (
+              <AppText
+                style={[
+                  styles.messageText,
+                  isMine ? styles.myMessageText : styles.theirMessageText,
+                ]}
+              >
+                {item.text}
+              </AppText>
+            )}
+
+            <AppText
+              style={[
+                styles.timeText,
+                isMine ? styles.myTimeText : styles.theirTimeText,
+              ]}
+            >
+              {formatTime(item.createdAt)}
+            </AppText>
+          </View>
+
+          {/* ─── Seen avatar (like Messenger) ──────────────────────────────── */}
+          {isLastSeen && (
+            <View style={styles.seenAvatarWrapper}>
+              {receiverImage ? (
+                <Image
+                  source={{ uri: receiverImage }}
+                  style={styles.seenAvatar}
+                />
+              ) : (
+                <View style={[styles.seenAvatar, styles.seenAvatarPlaceholder]}>
+                  <User size={s(9)} color={AppColors.textColor} />
+                </View>
+              )}
+            </View>
+          )}
+        </TouchableOpacity>
+      </>
     );
   };
 
@@ -340,15 +510,55 @@ const ChatScreen = ({ route }: any) => {
           )}
         </View>
 
+        {/* ─── Reply Preview ──────────────────────────────────────────────────── */}
+        {replyingTo && (
+          <View style={styles.replyPreviewContainer}>
+            <View style={styles.replyPreviewContent}>
+              <View style={{ flex: 1 }}>
+                <AppText style={styles.replyPreviewLabel}>Replying to:</AppText>
+                <AppText style={styles.replyPreviewText} numberOfLines={2}>
+                  {replyingTo.text}
+                </AppText>
+              </View>
+              <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                <X size={s(18)} color="#8f9299" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ─── Image Preview ──────────────────────────────────────────────────── */}
+        {selectedImageUri && (
+          <View style={styles.imagePreviewContainer}>
+            <Image
+              source={{ uri: selectedImageUri }}
+              style={styles.selectedImagePreview}
+            />
+            <TouchableOpacity
+              style={styles.removeImageButton}
+              onPress={() => setSelectedImageUri(null)}
+            >
+              <X size={s(16)} color="white" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View
           style={[
             styles.inputContainer,
             {
-              paddingBottom:
-                Platform.OS === 'ios' ? Math.max(insets.bottom, vs(10)) : vs(6),
+              paddingBottom: vs(6),
             },
           ]}
         >
+          <TouchableOpacity
+            style={styles.imagePickerButton}
+            onPress={handleImagePicker}
+            disabled={uploadingImage}
+          >
+            <ImageIcon size={s(20)} color={AppColors.secondaryColor} />
+          </TouchableOpacity>
+
           <TextInput
             value={messageText}
             onChangeText={setMessageText}
@@ -356,22 +566,65 @@ const ChatScreen = ({ route }: any) => {
             placeholderTextColor="#8f9299"
             multiline
             style={styles.input}
+            editable={!uploadingImage}
           />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!messageText.trim() || sending) && styles.disabledSendButton,
-            ]}
-            onPress={handleSend}
-            disabled={!messageText.trim() || sending}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color={AppColors.primaryColor} />
-            ) : (
-              <Send size={s(18)} color={AppColors.primaryColor} />
-            )}
-          </TouchableOpacity>
+
+          {selectedImageUri ? (
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                uploadingImage && styles.disabledSendButton,
+              ]}
+              onPress={handleSendImage}
+              disabled={uploadingImage}
+            >
+              {uploadingImage ? (
+                <ActivityIndicator size="small" color={AppColors.primaryColor} />
+              ) : (
+                <Send size={s(18)} color={AppColors.primaryColor} />
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                (!messageText.trim() || sending) && styles.disabledSendButton,
+              ]}
+              onPress={() => handleSend()}
+              disabled={!messageText.trim() || sending}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color={AppColors.primaryColor} />
+              ) : (
+                <Send size={s(18)} color={AppColors.primaryColor} />
+              )}
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* ─── Full Image Viewer Modal ─────────────────────────────────────── */}
+        <Modal
+          visible={!!viewingImageUrl}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setViewingImageUrl(null)}
+        >
+          <View style={styles.fullImageContainer}>
+            {viewingImageUrl && (
+              <Image
+                source={{ uri: viewingImageUrl }}
+                style={styles.fullImage}
+                resizeMode="contain"
+              />
+            )}
+            <TouchableOpacity
+              style={styles.closeFullImageButton}
+              onPress={() => setViewingImageUrl(null)}
+            >
+              <X size={s(24)} color="white" />
+            </TouchableOpacity>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -484,8 +737,8 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    minHeight: vs(42),
-    maxHeight: vs(110),
+    minHeight: s(42),
+    maxHeight: s(110),
     paddingHorizontal: s(12),
     paddingVertical: vs(9),
     borderRadius: s(8),
@@ -520,6 +773,127 @@ const styles = StyleSheet.create({
   },
   seenAvatarPlaceholder: {
     backgroundColor: AppColors.inputColor,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // ─── Date separator styles ────────────────────────────────────────────────
+  dateSeparator: {
+    alignItems: 'center',
+    marginVertical: vs(12),
+  },
+  dateSeparatorText: {
+    fontSize: s(12),
+    color: '#a6a9b0',
+  },
+  // ─── Quoted message styles ────────────────────────────────────────────────
+  quotedMessage: {
+    paddingHorizontal: s(10),
+    paddingVertical: vs(6),
+    marginBottom: vs(6),
+    borderLeftWidth: 3,
+    borderRadius: s(4),
+  },
+  quotedMessageMine: {
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderLeftColor: '#433900',
+  },
+  quotedMessageTheir: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderLeftColor: AppColors.textColor,
+  },
+  quotedSenderName: {
+    fontSize: s(10),
+    fontWeight: '600',
+    color: AppColors.textColor,
+    marginBottom: vs(2),
+  },
+  quotedText: {
+    fontSize: s(11),
+    color: AppColors.textColor,
+  },
+  // ─── Reply preview styles ─────────────────────────────────────────────────
+  replyPreviewContainer: {
+    backgroundColor: AppColors.cardColor,
+    borderTopWidth: 1,
+    borderTopColor: AppColors.inputColor,
+    paddingHorizontal: s(12),
+    paddingVertical: vs(8),
+  },
+  replyPreviewContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  replyPreviewLabel: {
+    fontSize: s(10),
+    color: '#8f9299',
+    fontWeight: '600',
+  },
+  replyPreviewText: {
+    fontSize: s(12),
+    color: AppColors.textColor,
+    marginTop: vs(2),
+  },
+  // ─── Image message styles ─────────────────────────────────────────────────
+  messageImage: {
+    width: s(220),
+    height: s(220),
+    borderRadius: s(12),
+    marginBottom: vs(6),
+  },
+  // ─── Image preview styles ─────────────────────────────────────────────────
+  imagePreviewContainer: {
+    paddingHorizontal: s(12),
+    paddingVertical: vs(8),
+    backgroundColor: AppColors.cardColor,
+    borderTopWidth: 1,
+    borderTopColor: AppColors.inputColor,
+  },
+  selectedImagePreview: {
+    width: '100%',
+    height: vs(200),
+    borderRadius: s(8),
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: vs(12),
+    right: s(16),
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: s(28),
+    height: s(28),
+    borderRadius: s(14),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // ─── Image picker button styles ───────────────────────────────────────────
+  imagePickerButton: {
+    width: s(42),
+    height: s(42),
+    borderRadius: s(8),
+    marginRight: s(8),
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: AppColors.inputColor,
+  },
+  // ─── Full image viewer modal styles ────────────────────────────────────────
+  fullImageContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullImage: {
+    width: '100%',
+    height: '100%',
+  },
+  closeFullImageButton: {
+    position: 'absolute',
+    top: s(20),
+    right: s(20),
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: s(40),
+    height: s(40),
+    borderRadius: s(20),
     justifyContent: 'center',
     alignItems: 'center',
   },

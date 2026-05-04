@@ -6,13 +6,14 @@ import {
   Truck,
   IdCardLanyard,
   User,
+  Van,
 } from 'lucide-react-native';
 import { AppColors } from '../styles/colors';
 import EmployeeList from '../screens/employee/EmployeeList';
 import DashBoard from '../screens/home/DashBoard';
 import { scale as s, vs } from 'react-native-size-matters';
-import VehiclesList from '../screens/vehicles/VehiclesList';
 import Profile from '../screens/profile/Profile';
+import TripList from '../screens/trip/TripList';
 
 const BottomTab = () => {
   const Tab = createBottomTabNavigator();
@@ -53,11 +54,11 @@ const BottomTab = () => {
       />
       <Tab.Screen
         options={{
-          tabBarIcon: ({ color }) => <Truck size={s(20)} color={color} />,
-          title: 'Vehicles',
+          tabBarIcon: ({ color }) => <Van size={s(20)} color={color} />,
+          title: 'Trips',
         }}
-        name="VehicleList"
-        component={VehiclesList}
+        name="TripList"
+        component={TripList}
       />
       <Tab.Screen
         options={{

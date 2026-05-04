@@ -85,6 +85,8 @@ const ChatList = () => {
         const adminsData = normalizeAdminsResponse(response.data).filter(
           admin => admin.id?.toString() !== currentUserId,
         );
+        console.log('Fetched admins:', adminsData);
+        console.log('Current user ID:', currentUserId);
         setAdmins(adminsData);
       } catch (error) {
         console.log('Error fetching admins:', error);
@@ -154,23 +156,41 @@ const ChatList = () => {
 
   // ─── Listen to online presence of all admins ──────────────────────────────
   useEffect(() => {
-    if (admins.length === 0) return;
+    if (admins.length === 0) {
+      console.log('No admins to listen to');
+      return;
+    }
+
+    console.log('Setting up presence listeners for admins:', admins.map(a => a.id));
 
     const unsubscribes = admins.map(admin => {
+      console.log('Listening to presence for admin:', admin.id);
       return firestore()
         .collection('presence')
         .doc(admin.id)
-        .onSnapshot(snapshot => {
-          if (!snapshot) return; // ← guard against null snapshot
-          const data = snapshot.exists() ? snapshot.data() ?? null : null;
-          setOnlineStatus(prev => ({
-            ...prev,
-            [admin.id]: data?.online === true,
-          }));
-        });
+        .onSnapshot(
+          snapshot => {
+            const data = snapshot.exists() ? snapshot.data() : null;
+            console.log(`Presence update for ${admin.id}:`, data);
+            setOnlineStatus(prev => ({
+              ...prev,
+              [admin.id]: data?.online === true,
+            }));
+          },
+          error => {
+            console.log(`Error listening to presence for ${admin.id}:`, error);
+            setOnlineStatus(prev => ({
+              ...prev,
+              [admin.id]: false,
+            }));
+          }
+        );
     });
 
-    return () => unsubscribes.forEach(unsub => unsub());
+    return () => {
+      console.log('Cleaning up presence listeners');
+      unsubscribes.forEach(unsub => unsub());
+    };
   }, [admins]);
 
   const emptyMessage = useMemo(() => {
@@ -236,7 +256,7 @@ const ChatList = () => {
               <User size={s(22)} color={AppColors.textColor} />
             </View>
           )}
-          {isOnline && <View style={styles.onlineDot} />}
+          <View style={[styles.statusDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
         </View>
 
         <View style={styles.chatInfo}>
@@ -315,7 +335,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    paddingTop: vs(10),
+    paddingTop: vs(0),
     paddingBottom: vs(18),
   },
   chatRow: {
@@ -338,16 +358,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: AppColors.inputColor,
   },
-  onlineDot: {
+  statusDot: {
     position: 'absolute',
     bottom: 1,
     right: 1,
     width: s(12),
     height: s(12),
     borderRadius: s(6),
-    backgroundColor: '#22c55e',
     borderWidth: 2,
     borderColor: AppColors.primaryColor,
+  },
+  onlineDot: {
+    backgroundColor: '#22c55e',
+  },
+  offlineDot: {
+    backgroundColor: '#a6a9b0',
   },
   chatInfo: {
     flex: 1,

@@ -1,7 +1,9 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import AuthStack from './AuthStack';
 import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import BootSplash from 'react-native-bootsplash';
 import EmployeeDetails from '../screens/employee/EmployeeDetails';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
@@ -19,6 +21,86 @@ const MainStack = () => {
   const [user, setUser] = useState<any>(null);
   const [initializing, setInitializing] = useState(true);
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
+
+  // ─── Listen to app state (foreground/background) ────────────────────────
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+
+    async function handleAppStateChange(state: AppStateStatus) {
+      const presenceRef = firestore().collection('presence').doc(user.uid);
+      
+      if (state === 'background' || state === 'inactive') {
+        // App is backgrounded or closed
+        console.log('📱 App backgrounded/closed. Setting user offline:', user.uid);
+        presenceRef.set(
+          {
+            online: false,
+            lastSeen: new Date(),
+          },
+          { merge: true }
+        )
+          .catch(error => console.log('❌ Error setting offline:', error.message));
+      } else if (state === 'active') {
+        // App came back to foreground
+        console.log('📱 App active. Setting user online:', user.uid);
+        presenceRef.set(
+          {
+            online: true,
+            lastSeen: new Date(),
+          },
+          { merge: true }
+        )
+          .catch(error => console.log('❌ Error setting online:', error.message));
+      }
+    }
+
+    return () => {
+      appStateSubscription.remove();
+    };
+  }, [user?.uid]);
+
+  // ─── Set user online status in Firestore ────────────────────────────────
+  useEffect(() => {
+    if (!user?.uid) {
+      console.log('No user UID, skipping presence update');
+      return;
+    }
+
+    const presenceRef = firestore().collection('presence').doc(user.uid);
+
+    // Set user online
+    console.log('Setting user online:', user.uid);
+    presenceRef.set(
+      {
+        online: true,
+        lastSeen: new Date(),
+      },
+      { merge: true }
+    )
+      .then(() => {
+        console.log('✅ Online status set successfully for', user.uid);
+        // Verify it was written
+        presenceRef.get().then(snap => {
+          console.log('✅ Verified presence doc:', snap.data());
+        });
+      })
+      .catch(error => console.log('❌ Error setting online status:', error));
+
+    // Clean up: set offline when unmounting or user logs out
+    return () => {
+      console.log('Setting user offline:', user.uid);
+      presenceRef.set(
+        {
+          online: false,
+          lastSeen: new Date(),
+        },
+        { merge: true }
+      )
+        .catch(error => console.log('❌ Error setting offline status:', error));
+    };
+  }, [user?.uid]);
 
   useEffect(() => {
     const checkOnboarding = async () => {

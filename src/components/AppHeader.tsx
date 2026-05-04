@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
     paddingTop: s(20),
     paddingBottom: s(20),
     borderWidth: .3,
-    borderBottomColor: AppColors.textColor
+    borderBottomColor: AppColors.textColor,
   },
   textContainer: {
     flex: 1,

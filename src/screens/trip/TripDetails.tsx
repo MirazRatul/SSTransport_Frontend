@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, View, ScrollView } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, ScrollView, TouchableOpacity, Modal, FlatList } from 'react-native';
 import React, { useCallback, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { container } from '../../constants/container';
@@ -106,6 +106,15 @@ const TripDetails = ({ route }: any) => {
   const tripId = selectedTripId || selectedTrip?.id?.toString();
   const [trip, setTrip] = useState<TripDetail | null>(selectedTrip || null);
   const [loading, setLoading] = useState(!selectedTrip);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  const statusOptions = [
+    { id: 'pending', name: 'Pending' },
+    { id: 'ongoing', name: 'Ongoing' },
+    { id: 'completed', name: 'Completed' },
+    { id: 'cancelled', name: 'Cancelled' },
+  ];
 
   const fetchTripDetails = useCallback(async () => {
     if (!tripId) {
@@ -168,6 +177,24 @@ const TripDetails = ({ route }: any) => {
     });
   };
 
+  const handleStatusUpdate = async (newStatus: string) => {
+    if (!tripId) return;
+
+    try {
+      setUpdatingStatus(true);
+      await apiClient.patch(`/trips/${tripId}/status?status=${newStatus}`);
+      
+      setTrip(prev => prev ? { ...prev, status: newStatus } : null);
+      showToast({ message: 'Trip status updated successfully!', type: 'success' });
+      setShowStatusModal(false);
+    } catch (error) {
+      console.log('Error updating trip status:', error);
+      showToast({ message: 'Failed to update trip status', type: 'error' });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   return (
     <SafeAreaView style={container}>
       <CommonHeader title="Trip Details" />
@@ -176,7 +203,8 @@ const TripDetails = ({ route }: any) => {
         <AppText variant="bold" style={styles.idText}>
           {trip.id}
         </AppText>
-        <View
+        <TouchableOpacity
+          onPress={() => setShowStatusModal(true)}
           style={[
             styles.statusContainer,
             styles.statusAlign,
@@ -184,7 +212,7 @@ const TripDetails = ({ route }: any) => {
           ]}
         >
           <AppText style={styles.textStatus}>{trip.status || 'N/A'}</AppText>
-        </View>
+        </TouchableOpacity>
       </View>
       <ScrollView showsVerticalScrollIndicator={false}>
         <TripDetailsCards
@@ -229,6 +257,46 @@ const TripDetails = ({ route }: any) => {
           subHeadingValue2={trip.goodsType || 'N/A'}
         />
       </ScrollView>
+
+      {/* Status Update Modal */}
+      <Modal visible={showStatusModal} transparent animationType="slide">
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          onPress={() => !updatingStatus && setShowStatusModal(false)}
+          disabled={updatingStatus}
+        >
+          <View style={styles.modalContent}>
+            <AppText style={styles.modalTitle}>Update Trip Status</AppText>
+            <FlatList
+              data={statusOptions}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.modalItem,
+                    trip?.status?.toLowerCase() === item.id && styles.modalItemSelected,
+                  ]}
+                  onPress={() => handleStatusUpdate(item.id)}
+                  disabled={updatingStatus}
+                >
+                  <AppText
+                    style={[
+                      styles.modalItemText,
+                      trip?.status?.toLowerCase() === item.id && styles.modalItemTextSelected,
+                    ]}
+                  >
+                    {item.name}
+                  </AppText>
+                  {updatingStatus && trip?.status?.toLowerCase() === item.id && (
+                    <ActivityIndicator size="small" color={AppColors.secondaryColor} />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -272,5 +340,46 @@ const styles = StyleSheet.create({
   },
   statusAlign: {
     alignSelf: 'flex-end',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: AppColors.cardColor,
+    borderTopLeftRadius: s(12),
+    borderTopRightRadius: s(12),
+    maxHeight: '50%',
+    paddingBottom: vs(20),
+  },
+  modalTitle: {
+    color: AppColors.textColor,
+    fontSize: s(16),
+    fontWeight: 'bold',
+    paddingVertical: vs(12),
+    paddingHorizontal: s(16),
+    borderBottomColor: AppColors.inputColor,
+    borderBottomWidth: 1,
+  },
+  modalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: vs(12),
+    paddingHorizontal: s(16),
+    borderBottomColor: AppColors.inputColor,
+    borderBottomWidth: 1,
+  },
+  modalItemSelected: {
+    backgroundColor: AppColors.secondaryColor + '20',
+  },
+  modalItemText: {
+    color: AppColors.textColor,
+    fontSize: s(14),
+  },
+  modalItemTextSelected: {
+    color: AppColors.secondaryColor,
+    fontWeight: 'bold',
   },
 });

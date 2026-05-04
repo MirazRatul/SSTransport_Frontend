@@ -25,6 +25,7 @@ import { useToast } from '../../components/Toast/ToastContext';
 interface DropdownItem {
   id: string;
   name: string;
+  role?: string;
 }
 
 interface CrewData {
@@ -69,13 +70,13 @@ const AddTrip = () => {
   const [driverId, setDriverId] = useState<string>('');
   const [helperId, setHelperId] = useState<string>('');
   const [vehicleId, setVehicleId] = useState<string>('');
-  const [status, setStatus] = useState('');
   const [fare, setFare] = useState('');
   const [goodsType, setGoodsType] = useState('');
 
   // Dropdown states
   const [showVehicleDropdown, setShowVehicleDropdown] = useState(false);
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showDriverDropdown, setShowDriverDropdown] = useState(false);
+  const [showHelperDropdown, setShowHelperDropdown] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Date picker states
@@ -91,12 +92,7 @@ const AddTrip = () => {
   const [helpers, setHelpers] = useState<DropdownItem[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  const statusOptions = [
-    { id: 'pending', name: 'Pending' },
-    { id: 'ongoing', name: 'Ongoing' },
-    { id: 'completed', name: 'Completed' },
-    { id: 'cancelled', name: 'Cancelled' },
-  ];
+
 
   const syncDatePicker = useCallback((dateValue?: string) => {
     if (!dateValue) return;
@@ -124,7 +120,6 @@ const AddTrip = () => {
     setVehicleId(vehicleIdValue);
     setDriverId(driverIdValue);
     setHelperId(helperIdValue);
-    setStatus(trip.status?.toLowerCase() || '');
     setFare(trip.fare?.toString() || '');
     setGoodsType(trip.goodsType || '');
     syncDatePicker(trip.date);
@@ -168,6 +163,30 @@ const AddTrip = () => {
         if (isEditMode) {
           const tripRes = await apiClient.get(`/trips/details/${tripId}`);
           populateTripForm(tripRes.data);
+          
+          // Fetch all employees
+          const employeesRes = await apiClient.get('/employees');
+          const allEmployees = employeesRes.data;
+
+          // Filter drivers
+          const driversList = allEmployees
+            .filter((emp: any) => emp.role?.toLowerCase() === 'driver')
+            .map((driver: any) => ({
+              id: driver.id.toString(),
+              name: driver.name,
+              role: driver.role,
+            }));
+          setDrivers(driversList);
+
+          // Filter helpers
+          const helpersList = allEmployees
+            .filter((emp: any) => emp.role?.toLowerCase() === 'helper')
+            .map((helper: any) => ({
+              id: helper.id.toString(),
+              name: helper.name,
+              role: helper.role,
+            }));
+          setHelpers(helpersList);
         }
       } catch (error) {
         console.log('Error fetching data:', error);
@@ -185,28 +204,41 @@ const AddTrip = () => {
     fetchData();
   }, [isEditMode, populateTripForm, showToast, tripId]);
 
-  // Fetch crew when vehicle is selected
+  // Fetch crew when vehicle is selected (only in add mode)
   const handleVehicleSelect = async (vehicleIdSelected: string) => {
     setVehicleId(vehicleIdSelected);
     setShowVehicleDropdown(false);
 
-    try {
-      const response = await apiClient.get(`/vehicles/crew/${vehicleIdSelected}`);
-      const crewData: CrewData = response.data;
-      
-      // Set driver
-      setDriverId(crewData.driverId.toString());
-      setDrivers([{ id: crewData.driverId.toString(), name: crewData.driverName }]);
-      
-      // Set helper
-      setHelperId(crewData.helperId.toString());
-      setHelpers([{ id: crewData.helperId.toString(), name: crewData.helperName }]);
-      
-      showToast({ message: 'Driver and Helper auto-filled', type: 'success' });
-    } catch (error) {
-      console.log('Error fetching crew:', error);
-      showToast({ message: 'Failed to load driver and helper', type: 'error' });
+    // Only auto-fill in add mode
+    if (!isEditMode) {
+      try {
+        const response = await apiClient.get(`/vehicles/crew/${vehicleIdSelected}`);
+        const crewData: CrewData = response.data;
+        
+        // Set driver
+        setDriverId(crewData.driverId.toString());
+        setDrivers([{ id: crewData.driverId.toString(), name: crewData.driverName }]);
+        
+        // Set helper
+        setHelperId(crewData.helperId.toString());
+        setHelpers([{ id: crewData.helperId.toString(), name: crewData.helperName }]);
+        
+        showToast({ message: 'Driver and Helper auto-filled', type: 'success' });
+      } catch (error) {
+        console.log('Error fetching crew:', error);
+        showToast({ message: 'Failed to load driver and helper', type: 'error' });
+      }
     }
+  };
+
+  const handleDriverSelect = (selectedDriverId: string) => {
+    setDriverId(selectedDriverId);
+    setShowDriverDropdown(false);
+  };
+
+  const handleHelperSelect = (selectedHelperId: string) => {
+    setHelperId(selectedHelperId);
+    setShowHelperDropdown(false);
   };
 
   const generateYears = () => {
@@ -267,10 +299,6 @@ const AddTrip = () => {
       showToast({ message: 'Vehicle is required', type: 'warning' });
       return false;
     }
-    if (!status) {
-      showToast({ message: 'Status is required', type: 'warning' });
-      return false;
-    }
     if (!fare.trim()) {
       showToast({ message: 'Fare is required', type: 'warning' });
       return false;
@@ -289,7 +317,7 @@ const AddTrip = () => {
     try {
       setLoading(true);
 
-      const tripData = {
+      const tripData: any = {
         date,
         pickupDest: pickupDest.trim(),
         dropDest: dropDest.trim(),
@@ -298,10 +326,14 @@ const AddTrip = () => {
         driverId: parseInt(driverId, 10),
         helperId: parseInt(helperId, 10),
         vehicleId: vehicleId,
-        status,
         fare: parseInt(fare, 10),
         goodsType: goodsType.trim(),
       };
+
+      // Only add status for new trips
+      if (!isEditMode) {
+        tripData.status = 'pending';
+      }
 
       if (isEditMode) {
         await apiClient.put(`/trips/${tripId}`, tripData);
@@ -408,35 +440,53 @@ const AddTrip = () => {
             <ChevronDown size={20} color={AppColors.textColor} />
           </TouchableOpacity>
 
-          {/* Driver (Auto-filled) */}
-          <AppText style={styles.label}>Driver (Auto-filled)</AppText>
-          <View style={[styles.dropdownButton, { opacity: 0.6 }]}>
-            <AppText style={styles.dropdownText}>
-              {driverId ? drivers[0]?.name : 'Will auto-fill when vehicle selected'}
-            </AppText>
-          </View>
+          {/* Driver */}
+          <AppText style={styles.label}>
+            Driver {isEditMode ? '' : '(Auto-filled)'}
+          </AppText>
+          {isEditMode ? (
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => setShowDriverDropdown(true)}
+            >
+              <AppText style={styles.dropdownText}>
+                {driverId
+                  ? drivers.find(d => d.id === driverId)?.name
+                  : 'Select Driver'}
+              </AppText>
+              <ChevronDown size={20} color={AppColors.textColor} />
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.dropdownButton, { opacity: 0.6 }]}>
+              <AppText style={styles.dropdownText}>
+                {driverId ? drivers[0]?.name : 'Will auto-fill when vehicle selected'}
+              </AppText>
+            </View>
+          )}
 
-          {/* Helper (Auto-filled) */}
-          <AppText style={styles.label}>Helper (Auto-filled)</AppText>
-          <View style={[styles.dropdownButton, { opacity: 0.6 }]}>
-            <AppText style={styles.dropdownText}>
-              {helperId ? helpers[0]?.name : 'Will auto-fill when vehicle selected'}
-            </AppText>
-          </View>
-
-          {/* Status Dropdown */}
-          <AppText style={styles.label}>Trip Status</AppText>
-          <TouchableOpacity
-            style={styles.dropdownButton}
-            onPress={() => setShowStatusDropdown(true)}
-          >
-            <AppText style={styles.dropdownText}>
-              {status
-                ? statusOptions.find(s => s.id === status)?.name
-                : 'Select Status'}
-            </AppText>
-            <ChevronDown size={20} color={AppColors.textColor} />
-          </TouchableOpacity>
+          {/* Helper */}
+          <AppText style={styles.label}>
+            Helper {isEditMode ? '' : '(Auto-filled)'}
+          </AppText>
+          {isEditMode ? (
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => setShowHelperDropdown(true)}
+            >
+              <AppText style={styles.dropdownText}>
+                {helperId
+                  ? helpers.find(h => h.id === helperId)?.name
+                  : 'Select Helper'}
+              </AppText>
+              <ChevronDown size={20} color={AppColors.textColor} />
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.dropdownButton, { opacity: 0.6 }]}>
+              <AppText style={styles.dropdownText}>
+                {helperId ? helpers[0]?.name : 'Will auto-fill when vehicle selected'}
+              </AppText>
+            </View>
+          )}
 
           {/* Fare */}
           <AppInput
@@ -496,31 +546,55 @@ const AddTrip = () => {
         </TouchableOpacity>
       </Modal>
 
-      {/* Status Dropdown Modal */}
-      <Modal visible={showStatusDropdown} transparent animationType="slide">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          onPress={() => setShowStatusDropdown(false)}
-        >
-          <View style={styles.modalContent}>
-            <FlatList
-              data={statusOptions}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalItem}
-                  onPress={() => {
-                    setStatus(item.id);
-                    setShowStatusDropdown(false);
-                  }}
-                >
-                  <AppText>{item.name}</AppText>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      {/* Driver Dropdown Modal */}
+      {isEditMode && (
+        <Modal visible={showDriverDropdown} transparent animationType="slide">
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            onPress={() => setShowDriverDropdown(false)}
+          >
+            <View style={styles.modalContent}>
+              <FlatList
+                data={drivers}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.modalItem}
+                    onPress={() => handleDriverSelect(item.id)}
+                  >
+                    <AppText>{item.name}</AppText>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* Helper Dropdown Modal */}
+      {isEditMode && (
+        <Modal visible={showHelperDropdown} transparent animationType="slide">
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            onPress={() => setShowHelperDropdown(false)}
+          >
+            <View style={styles.modalContent}>
+              <FlatList
+                data={helpers}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.modalItem}
+                    onPress={() => handleHelperSelect(item.id)}
+                  >
+                    <AppText>{item.name}</AppText>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
 
       {/* DateTime Picker Modal */}
       <Modal visible={showDatePicker} transparent animationType="slide">

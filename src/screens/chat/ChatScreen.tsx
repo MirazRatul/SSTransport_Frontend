@@ -39,7 +39,8 @@ interface ChatMessage {
   imageUrl?: string;
   replyTo?: {
     messageId: string;
-    text: string;
+    text?: string;
+    imageUrl?: string | null;
     senderName: string;
     senderId: string;
   };
@@ -378,7 +379,8 @@ const ChatScreen = ({ route }: any) => {
       if (replyingTo) {
         messageData.replyTo = {
           messageId: replyingTo.id,
-          text: replyingTo.text,
+            text: replyingTo.text || (replyingTo.imageUrl ? '📷 Image' : ''),
+            imageUrl: replyingTo.imageUrl || null,
           senderName: replyingTo.senderId === currentUser.uid ? 'You' : (receiverName || 'Admin'),
           senderId: replyingTo.senderId,
         };
@@ -535,7 +537,7 @@ const ChatScreen = ({ route }: any) => {
                   style={styles.quotedText}
                   numberOfLines={2}
                 >
-                  {item.replyTo.text}
+                    {item.replyTo.text || (item.replyTo.imageUrl ? '📷 Image' : '')}
                 </AppText>
               </View>
             )}
@@ -558,7 +560,7 @@ const ChatScreen = ({ route }: any) => {
                   isMine ? styles.myMessageText : styles.theirMessageText,
                 ]}
               >
-                {item.text}
+                  {item.text || (item.imageUrl ? '📷 Image' : '')}
               </AppText>
             )}
 
@@ -695,7 +697,7 @@ const ChatScreen = ({ route }: any) => {
               <View style={{ flex: 1 }}>
                 <AppText style={styles.replyPreviewLabel}>Replying to:</AppText>
                 <AppText style={styles.replyPreviewText} numberOfLines={2}>
-                  {replyingTo.text}
+                  {replyingTo.text || (replyingTo.imageUrl ? '📷 Image' : '')}
                 </AppText>
               </View>
               <TouchableOpacity onPress={() => setReplyingTo(null)}>

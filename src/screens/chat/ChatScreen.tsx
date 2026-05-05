@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -106,6 +106,9 @@ const ChatScreen = ({ route }: any) => {
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null);
+  const [isReceiverTyping, setIsReceiverTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
 
   const conversationId = useMemo(() => {
     if (!currentUser?.uid || !receiverId) return null;
@@ -157,6 +160,27 @@ const ChatScreen = ({ route }: any) => {
     );
   }, [conversationRef, currentUser?.uid]);
 
+  const updateTypingStatus = useCallback(
+    async (isTyping: boolean) => {
+      if (!conversationRef || !currentUser?.uid) return;
+
+      try {
+        await conversationRef.set(
+          {
+            typingBy: { [currentUser.uid]: isTyping },
+            typingUpdatedAt: {
+              [currentUser.uid]: firestore.FieldValue.serverTimestamp(),
+            },
+          },
+          { merge: true },
+        );
+      } catch (error) {
+        console.log('Typing status error:', error);
+      }
+    },
+    [conversationRef, currentUser?.uid],
+  );
+
   useEffect(() => {
     if (!conversationRef || !currentUser?.uid || !receiverId) {
       setLoading(false);
@@ -198,6 +222,7 @@ const ChatScreen = ({ route }: any) => {
           const data = snapshot.data();
           const ts = data?.seenBy?.[receiverId];
           setReceiverLastSeen(ts?.toDate?.()?.getTime?.() ?? null);
+          setIsReceiverTyping(Boolean(data?.typingBy?.[receiverId]));
         });
       })
       .catch(error => {
@@ -211,6 +236,31 @@ const ChatScreen = ({ route }: any) => {
       unsubscribeConversation?.();
     };
   }, [conversationRef, currentUser?.uid, ensureConversation, markAsSeen, receiverId]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      updateTypingStatus(false);
+    };
+  }, [updateTypingStatus]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const showSub = Keyboard.addListener('keyboardDidShow', event => {
+      setAndroidKeyboardHeight(event.endCoordinates?.height || 0);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setAndroidKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // ─── Find the last message sent by me that receiver has seen ─────────────
   const lastSeenMessageId = useMemo(() => {
@@ -239,6 +289,7 @@ const ChatScreen = ({ route }: any) => {
     try {
       setSending(true);
       setMessageText('');
+      updateTypingStatus(false);
 
       const createdAt = firestore.FieldValue.serverTimestamp();
       const messageRef = conversationRef.collection('messages').doc();
@@ -329,6 +380,19 @@ const ChatScreen = ({ route }: any) => {
     }
   };
 
+  const handleChangeText = (text: string) => {
+    setMessageText(text);
+    updateTypingStatus(true);
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      updateTypingStatus(false);
+    }, 1500);
+  };
+
   // ─── Send image message ──────────────────────────────────────────────────────
   const handleSendImage = async () => {
     if (!selectedImageUri) return;
@@ -352,7 +416,8 @@ const ChatScreen = ({ route }: any) => {
     const isMine = item.senderId === currentUser?.uid;
     const isLastSeen = isMine && item.id === lastSeenMessageId;
 
-    // Check if next message (since list is inverted) is from a different date
+    // For an inverted list, compare with the next item and render the separator after the message
+    // so it appears above the first message of the day in the UI.
     const nextMessage = messages[index + 1];
     const currentDate = item.createdAt?.toDate?.()?.toDateString?.();
     const nextDate = nextMessage?.createdAt?.toDate?.()?.toDateString?.();
@@ -360,13 +425,6 @@ const ChatScreen = ({ route }: any) => {
 
     return (
       <>
-        {showDateSeparator && (
-          <View style={styles.dateSeparator}>
-            <AppText style={styles.dateSeparatorText}>
-              {formatMessageDate(item.createdAt)}
-            </AppText>
-          </View>
-        )}
         <TouchableOpacity
           style={[
             styles.messageRow,
@@ -375,6 +433,20 @@ const ChatScreen = ({ route }: any) => {
           onLongPress={() => handleReply(item)}
           delayLongPress={200}
         >
+          {!isMine && (
+            receiverImage ? (
+              <Image
+                source={{ uri: receiverImage }}
+                style={styles.receiverAvatar}
+              />
+            ) : (
+              <View
+                style={[styles.receiverAvatar, styles.receiverAvatarPlaceholder]}
+              >
+                <User size={s(12)} color={AppColors.textColor} />
+              </View>
+            )
+          )}
           <View
             style={[styles.bubble, isMine ? styles.myBubble : styles.theirBubble]}
           >
@@ -441,6 +513,13 @@ const ChatScreen = ({ route }: any) => {
             </View>
           )}
         </TouchableOpacity>
+        {showDateSeparator && (
+          <View style={styles.dateSeparator}>
+            <AppText style={styles.dateSeparatorText}>
+              {formatMessageDate(item.createdAt)}
+            </AppText>
+          </View>
+        )}
       </>
     );
   };
@@ -463,7 +542,7 @@ const ChatScreen = ({ route }: any) => {
       <CommonHeader title="Chat" />
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
         <View style={styles.contentContainer} onTouchStart={Keyboard.dismiss}>
@@ -506,11 +585,35 @@ const ChatScreen = ({ route }: any) => {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.messagesContent}
+              ListHeaderComponent={
+                isReceiverTyping ? (
+                  <View style={styles.typingRow}>
+                    {receiverImage ? (
+                      <Image
+                        source={{ uri: receiverImage }}
+                        style={styles.typingAvatar}
+                      />
+                    ) : (
+                      <View
+                        style={[
+                          styles.typingAvatar,
+                          styles.typingAvatarPlaceholder,
+                        ]}
+                      >
+                        <User size={s(10)} color={AppColors.textColor} />
+                      </View>
+                    )}
+                    <View style={styles.typingBubble}>
+                      <AppText style={styles.typingText}>Typing...</AppText>
+                    </View>
+                  </View>
+                ) : null
+              }
             />
           )}
         </View>
 
-        {/* ─── Reply Preview ──────────────────────────────────────────────────── */}
+        {/* ─── Reply Preview ──── */}
         {replyingTo && (
           <View style={styles.replyPreviewContainer}>
             <View style={styles.replyPreviewContent}>
@@ -548,6 +651,7 @@ const ChatScreen = ({ route }: any) => {
             styles.inputContainer,
             {
               paddingBottom: vs(6),
+              marginBottom: Platform.OS === 'android' ? androidKeyboardHeight : 0,
             },
           ]}
         >
@@ -561,12 +665,18 @@ const ChatScreen = ({ route }: any) => {
 
           <TextInput
             value={messageText}
-            onChangeText={setMessageText}
+            onChangeText={handleChangeText}
             placeholder="Message"
             placeholderTextColor="#8f9299"
             multiline
             style={styles.input}
             editable={!uploadingImage}
+            onBlur={() => {
+              if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+              }
+              updateTypingStatus(false);
+            }}
           />
 
           {selectedImageUri ? (
@@ -673,6 +783,36 @@ const styles = StyleSheet.create({
     fontSize: s(15),
     textAlign: 'center',
   },
+  typingRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingVertical: vs(4),
+  },
+  typingAvatar: {
+    width: s(24),
+    height: s(24),
+    borderRadius: s(12),
+    marginRight: s(6),
+    borderWidth: 1,
+    borderColor: AppColors.secondaryColor,
+  },
+  typingAvatarPlaceholder: {
+    backgroundColor: AppColors.inputColor,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  typingBubble: {
+    backgroundColor: AppColors.cardColor,
+    borderRadius: s(8),
+    paddingHorizontal: s(12),
+    paddingVertical: vs(6),
+    maxWidth: '78%',
+  },
+  typingText: {
+    fontSize: s(12),
+    color: '#8f9299',
+  },
   messagesContent: {
     flexGrow: 1,
     justifyContent: 'flex-end',
@@ -692,6 +832,19 @@ const styles = StyleSheet.create({
   },
   theirMessageRow: {
     justifyContent: 'flex-start',
+  },
+  receiverAvatar: {
+    width: s(24),
+    height: s(24),
+    borderRadius: s(12),
+    marginRight: s(6),
+    borderWidth: 1,
+    borderColor: AppColors.secondaryColor,
+  },
+  receiverAvatarPlaceholder: {
+    backgroundColor: AppColors.inputColor,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   bubble: {
     maxWidth: '78%',

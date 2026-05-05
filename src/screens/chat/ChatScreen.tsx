@@ -450,6 +450,12 @@ const ChatScreen = ({ route }: any) => {
           <View
             style={[styles.bubble, isMine ? styles.myBubble : styles.theirBubble]}
           >
+            <View
+              style={[
+                styles.bubbleTail,
+                isMine ? styles.myBubbleTail : styles.theirBubbleTail,
+              ]}
+            />
             {/* ─── Show quoted message if this is a reply ──────────────────────── */}
             {item.replyTo && (
               <View style={[styles.quotedMessage, isMine ? styles.quotedMessageMine : styles.quotedMessageTheir]}>
@@ -824,7 +830,7 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     flexDirection: 'row',
-    marginBottom: vs(8),
+    marginBottom: vs(10),
     alignItems: 'flex-end', // ← keeps seen avatar pinned to bubble bottom
   },
   myMessageRow: {
@@ -848,21 +854,42 @@ const styles = StyleSheet.create({
   },
   bubble: {
     maxWidth: '78%',
-    borderRadius: s(8),
+    borderRadius: s(12),
     paddingHorizontal: s(12),
-    paddingVertical: vs(8),
+    paddingVertical: vs(7),
+    minWidth: s(36),
+    position: 'relative',
   },
   myBubble: {
     backgroundColor: AppColors.secondaryColor,
-    borderBottomRightRadius: s(2),
+    borderBottomRightRadius: s(4),
+    borderTopRightRadius: s(14),
   },
   theirBubble: {
     backgroundColor: AppColors.cardColor,
-    borderBottomLeftRadius: s(2),
+    borderBottomLeftRadius: s(4),
+    borderTopLeftRadius: s(14),
+  },
+  bubbleTail: {
+    position: 'absolute',
+    bottom: s(5),
+    width: s(6),
+    height: s(6),
+    transform: [{ rotate: '45deg' }],
+  },
+  myBubbleTail: {
+    right: s(-2),
+    backgroundColor: AppColors.secondaryColor,
+    borderTopRightRadius: s(2),
+  },
+  theirBubbleTail: {
+    left: s(-2),
+    backgroundColor: AppColors.cardColor,
+    borderTopLeftRadius: s(2),
   },
   messageText: {
     fontSize: s(14),
-    lineHeight: s(19),
+    lineHeight: s(18),
   },
   myMessageText: {
     color: AppColors.primaryColor,

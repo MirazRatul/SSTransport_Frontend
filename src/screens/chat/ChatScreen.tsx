@@ -1,11 +1,13 @@
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   StyleSheet,
   TextInput,
@@ -42,6 +44,73 @@ interface ChatMessage {
     senderId: string;
   };
 }
+
+type SwipeableMessageRowProps = {
+  isMine: boolean;
+  onReply: () => void;
+  style?: any;
+  children: React.ReactNode;
+};
+
+const SwipeableMessageRow = ({ isMine, onReply, style, children }: SwipeableMessageRowProps) => {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const dragLimit = s(64);
+
+  const resetPosition = () => {
+    Animated.spring(translateX, {
+      toValue: 0,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 0,
+    }).start();
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, gestureState) =>
+        Math.abs(gestureState.dx) > 8 && Math.abs(gestureState.dy) < 8,
+      onPanResponderMove: (_, gestureState) => {
+        let dx = gestureState.dx;
+        dx = isMine ? Math.min(0, dx) : Math.max(0, dx);
+        dx = Math.max(-dragLimit, Math.min(dragLimit, dx));
+        translateX.setValue(dx);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const dx = gestureState.dx;
+        if (isMine && dx < -40) {
+          onReply();
+        }
+
+        if (!isMine && dx > 40) {
+          onReply();
+        }
+
+        resetPosition();
+      },
+      onPanResponderTerminate: (_, gestureState) => {
+        const dx = gestureState.dx;
+        if (isMine && dx < -40) {
+          onReply();
+        }
+
+        if (!isMine && dx > 40) {
+          onReply();
+        }
+
+        resetPosition();
+      },
+    }),
+  ).current;
+
+  return (
+    <Animated.View
+      style={[style, { transform: [{ translateX }] }]}
+      {...panResponder.panHandlers}
+    >
+      {children}
+    </Animated.View>
+  );
+};
 
 const getChatId = (firstUserId: string, secondUserId: string) => {
   return [firstUserId, secondUserId].sort().join('_');
@@ -425,13 +494,13 @@ const ChatScreen = ({ route }: any) => {
 
     return (
       <>
-        <TouchableOpacity
+        <SwipeableMessageRow
+          isMine={isMine}
+          onReply={() => handleReply(item)}
           style={[
             styles.messageRow,
             isMine ? styles.myMessageRow : styles.theirMessageRow,
           ]}
-          onLongPress={() => handleReply(item)}
-          delayLongPress={200}
         >
           {!isMine && (
             receiverImage ? (
@@ -518,7 +587,7 @@ const ChatScreen = ({ route }: any) => {
               )}
             </View>
           )}
-        </TouchableOpacity>
+        </SwipeableMessageRow>
         {showDateSeparator && (
           <View style={styles.dateSeparator}>
             <AppText style={styles.dateSeparatorText}>
@@ -1016,8 +1085,8 @@ const styles = StyleSheet.create({
   },
   // ─── Image message styles ─────────────────────────────────────────────────
   messageImage: {
-    width: s(220),
-    height: s(220),
+    width: s(170),
+    height: s(170),
     borderRadius: s(12),
     marginBottom: vs(6),
   },

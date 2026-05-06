@@ -245,6 +245,7 @@ const TripList = () => {
             />
           )}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={filteredData.length === 0 && styles.emptyListContent}
           ListEmptyComponent={
             searchText.length > 0 ? (
               <View style={styles.noDataFound}>
@@ -270,6 +271,9 @@ const styles = StyleSheet.create({
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  emptyListContent: {
+    flexGrow: 1,
   },
   noDataFound: {
     flex: 1,

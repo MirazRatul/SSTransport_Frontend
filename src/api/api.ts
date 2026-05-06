@@ -7,7 +7,7 @@ import auth from '@react-native-firebase/auth';
 import { BASE_URL, BASE_URL_TWO } from '@env';
 
 const apiClient = axios.create({
-  baseURL: BASE_URL,
+  baseURL: BASE_URL_TWO,
   headers: {
     'Content-Type': 'application/json',
   },

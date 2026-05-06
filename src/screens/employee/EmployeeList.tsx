@@ -1,24 +1,18 @@
 import {
-  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import EmployeeCard from '../../components/EmployeeCard';
 import React, { useState, useMemo, useEffect } from 'react';
-import { sharedPadding } from '../../constants/SharedPadding';
 import { AppColors } from '../../styles/colors';
 import { container } from '../../constants/container';
 import AppHeader from '../../components/AppHeader';
 import AppInput from '../../components/AppInput';
-import AppButton from '../../components/AppButton';
 import { scale as s } from 'react-native-size-matters';
 import AppText from '../../components/AppText';
-import EmployeeDetails from './EmployeeDetails';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../api/api';
 import EmployeeListSkeleton from '../../components/SkeletonLoader/EmployeeListSkeleton';
@@ -70,7 +64,6 @@ const EmployeeList = () => {
   useEffect(() => {
     console.log('Fetching employee data...');
     fetchEmployee();
-    console.log('Employee data state after fetch:',JSON.stringify(employeeData, null, 2));
   },[]);
 
   const handleEmployeeSelect = (employee: Employee) => {
@@ -107,6 +100,7 @@ const EmployeeList = () => {
           placeholder="Search Employees"
           type="search"
           onChangeText={setSearchText}
+          containerStyle={styles.searchInput}
         />
         <View style={styles.filterBtnCont}>
           <TouchableOpacity
@@ -217,6 +211,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: s(5),
     marginBottom: s(15),
+  },
+  searchInput: {
+    marginTop: s(10),
   },
   filterBtn: {
     backgroundColor: AppColors.cardColor,

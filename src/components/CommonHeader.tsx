@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import React from 'react';
 import BackButton from './BackButton';
 import AppText from './AppText';
@@ -10,8 +10,8 @@ interface headerProps {
 
 const CommonHeader = ({ title }: headerProps) => {
   return (
-    <View style={{ justifyContent: 'center', height: s(40) }}>
-      <AppText style={{ alignSelf: 'center', fontSize: s(17) }} variant="bold">
+    <View style={styles.container}>
+      <AppText style={styles.title} variant="bold">
         {title}
       </AppText>
       <BackButton />
@@ -21,4 +21,13 @@ const CommonHeader = ({ title }: headerProps) => {
 
 export default CommonHeader;
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  container: {
+    justifyContent: 'center',
+    height: s(40),
+  },
+  title: {
+    alignSelf: 'center',
+    fontSize: s(17),
+  },
+});

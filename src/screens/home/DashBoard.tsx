@@ -247,6 +247,7 @@ const DashBoard = () => {
         }
         contentContainerStyle={{
           paddingBottom: vs(20),
+          marginTop: vs(10),
         }}
       >
         <View>

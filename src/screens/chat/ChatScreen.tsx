@@ -25,6 +25,9 @@ import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from '@env';
 import { scale as s, vs } from 'react-native-size-matters';
 import AppText from '../../components/AppText';
 import CommonHeader from '../../components/CommonHeader';
+import MessageReaction, {
+  MessageReactionsMap,
+} from '../../components/chat/MessageReaction';
 import { container } from '../../constants/container';
 import { AppColors } from '../../styles/colors';
 
@@ -35,6 +38,7 @@ interface ChatMessage {
   receiverId: string;
   createdAt?: any;
   imageUrl?: string;
+  reactions?: MessageReactionsMap;
   replyTo?: {
     messageId: string;
     text?: string;
@@ -235,6 +239,9 @@ const ChatScreen = ({ route }: any) => {
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null);
+  const [messageReactions, setMessageReactions] = useState<
+    Record<string, MessageReactionsMap>
+  >({});
   const [isReceiverTyping, setIsReceiverTyping] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
@@ -348,11 +355,12 @@ const ChatScreen = ({ route }: any) => {
 
         // ─── Listen to receiver's seen timestamp ──────────────────────────
         unsubscribeConversation = conversationRef.onSnapshot(snapshot => {
-          const data = snapshot.data();
-          const ts = data?.seenBy?.[receiverId];
-          setReceiverLastSeen(ts?.toDate?.()?.getTime?.() ?? null);
-          setIsReceiverTyping(Boolean(data?.typingBy?.[receiverId]));
-        });
+        const data = snapshot.data();
+        const ts = data?.seenBy?.[receiverId];
+        setReceiverLastSeen(ts?.toDate?.()?.getTime?.() ?? null);
+        setIsReceiverTyping(Boolean(data?.typingBy?.[receiverId]));
+        setMessageReactions(data?.messageReactions || {});
+      });
       })
       .catch(error => {
         console.log('Conversation setup error:', error);
@@ -504,6 +512,29 @@ const ChatScreen = ({ route }: any) => {
     [handleOpenLink],
   );
 
+  const handleSelectReaction = useCallback(
+    async (messageId: string, reaction: string | null) => {
+      if (!conversationRef || !currentUser?.uid) return;
+
+      try {
+        await conversationRef.set(
+          {
+            messageReactions: {
+              [messageId]: {
+                [currentUser.uid]: reaction,
+              },
+            },
+          },
+          { merge: true },
+        );
+      } catch (error) {
+        console.log('Reaction error:', error);
+        Alert.alert('Reaction Error', 'Unable to update your reaction.');
+      }
+    },
+    [conversationRef, currentUser?.uid],
+  );
+
   // ─── Upload to Cloudinary ───────────────────────────────────────────────────
   const uploadToCloudinary = async (localUri: string, fileName: string): Promise<string> => {
     const filename = fileName || localUri.split('/').pop() || 'chat_image.jpg';
@@ -574,7 +605,10 @@ const ChatScreen = ({ route }: any) => {
   };
 
   const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
-    const isMine = item.senderId === currentUser?.uid;
+    const currentUserId = currentUser?.uid;
+    if (!currentUserId) return null;
+
+    const isMine = item.senderId === currentUserId;
     const isLastSeen = isMine && item.id === lastSeenMessageId;
 
     // For an inverted list, compare with the next item and render the separator after the message
@@ -608,61 +642,75 @@ const ChatScreen = ({ route }: any) => {
               </View>
             )
           )}
-          <View
-            style={[styles.bubble, isMine ? styles.myBubble : styles.theirBubble]}
+          <MessageReaction
+            currentUserId={currentUserId}
+            isMine={isMine}
+            reactions={{
+              ...(messageReactions[item.id] || {}),
+              ...(item.reactions || {}),
+            }}
+            onSelectReaction={reaction => handleSelectReaction(item.id, reaction)}
           >
             <View
               style={[
-                styles.bubbleTail,
-                isMine ? styles.myBubbleTail : styles.theirBubbleTail,
-              ]}
-            />
-            {/* ─── Show quoted message if this is a reply ──────────────────────── */}
-            {item.replyTo && (
-              <View style={[styles.quotedMessage, isMine ? styles.quotedMessageMine : styles.quotedMessageTheir]}>
-                <AppText style={styles.quotedSenderName}>
-                  {item.replyTo.senderName}
-                </AppText>
-                <AppText
-                  style={styles.quotedText}
-                  numberOfLines={2}
-                >
-                    {item.replyTo.text || (item.replyTo.imageUrl ? '📷 Image' : '')}
-                </AppText>
-              </View>
-            )}
-
-            {/* ─── Display Image ──────────────────────────────────────────────── */}
-            {item.imageUrl && (
-              <TouchableOpacity onPress={() => setViewingImageUrl(item.imageUrl || '')}>
-                <Image
-                  source={{ uri: item.imageUrl }}
-                  style={styles.messageImage}
-                />
-              </TouchableOpacity>
-            )}
-
-            {/* ─── Display Text ──────────────────────────────────────────────── */}
-            {item.text && (
-              <AppText
-                style={[
-                  styles.messageText,
-                  isMine ? styles.myMessageText : styles.theirMessageText,
-                ]}
-              >
-                  {renderMessageText(item.text)}
-              </AppText>
-            )}
-
-            <AppText
-              style={[
-                styles.timeText,
-                isMine ? styles.myTimeText : styles.theirTimeText,
+                styles.bubble,
+                styles.reactionBubble,
+                isMine ? styles.myBubble : styles.theirBubble,
               ]}
             >
-              {formatTime(item.createdAt)}
-            </AppText>
-          </View>
+              <View
+                style={[
+                  styles.bubbleTail,
+                  isMine ? styles.myBubbleTail : styles.theirBubbleTail,
+                ]}
+              />
+              {/* ─── Show quoted message if this is a reply ──────────────────────── */}
+              {item.replyTo && (
+                <View style={[styles.quotedMessage, isMine ? styles.quotedMessageMine : styles.quotedMessageTheir]}>
+                  <AppText style={styles.quotedSenderName}>
+                    {item.replyTo.senderName}
+                  </AppText>
+                  <AppText
+                    style={styles.quotedText}
+                    numberOfLines={2}
+                  >
+                      {item.replyTo.text || (item.replyTo.imageUrl ? '📷 Image' : '')}
+                  </AppText>
+                </View>
+              )}
+
+              {/* ─── Display Image ──────────────────────────────────────────────── */}
+              {item.imageUrl && (
+                <TouchableOpacity onPress={() => setViewingImageUrl(item.imageUrl || '')}>
+                  <Image
+                    source={{ uri: item.imageUrl }}
+                    style={styles.messageImage}
+                  />
+                </TouchableOpacity>
+              )}
+
+              {/* ─── Display Text ──────────────────────────────────────────────── */}
+              {item.text && (
+                <AppText
+                  style={[
+                    styles.messageText,
+                    isMine ? styles.myMessageText : styles.theirMessageText,
+                  ]}
+                >
+                    {renderMessageText(item.text)}
+                </AppText>
+              )}
+
+              <AppText
+                style={[
+                  styles.timeText,
+                  isMine ? styles.myTimeText : styles.theirTimeText,
+                ]}
+              >
+                {formatTime(item.createdAt)}
+              </AppText>
+            </View>
+          </MessageReaction>
 
           {/* ─── Seen avatar (like Messenger) ──────────────────────────────── */}
           {isLastSeen && (
@@ -1020,6 +1068,9 @@ const styles = StyleSheet.create({
     paddingVertical: vs(7),
     minWidth: s(36),
     position: 'relative',
+  },
+  reactionBubble: {
+    maxWidth: '100%',
   },
   myBubble: {
     backgroundColor: AppColors.secondaryColor,

@@ -17,6 +17,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { AppColors } from '../../styles/colors';
 import { useToast } from '../../components/Toast/ToastContext';
 import DashboardSkeleton from '../../components/SkeletonLoader/DashboardSkeleton';
+import PermissionDeniedState from '../../components/PermissionDeniedState';
+import { isPermissionError } from '../../utils/permissionError';
 
 type TripStatus = 'ongoing' | 'pending' | 'completed' | 'cancelled';
 
@@ -119,6 +121,7 @@ const DashBoard = () => {
     useState<TripsByStatus>(initialTripsByStatus);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const fetchUserInfo = async () => {
     const userData = await AsyncStorage.getItem('userData');
@@ -158,8 +161,15 @@ const DashBoard = () => {
       );
 
       setTripsByStatus(nextTripsByStatus);
-    } catch (error) {
+      setPermissionDenied(false);
+    } catch (error: any) {
       console.log('Error fetching dashboard trips:', error);
+      if (isPermissionError(error)) {
+        setPermissionDenied(true);
+        setTripsByStatus(initialTripsByStatus);
+        return;
+      }
+
       showToast({ message: 'Failed to load dashboard trips', type: 'error' });
     } finally {
       if (showLoader) {
@@ -234,6 +244,14 @@ const DashBoard = () => {
   return (
     <>
       <AppHeader title={'Dashboard'} />
+      {permissionDenied ? (
+        <View style={container}>
+          <PermissionDeniedState
+            title="Dashboard access restricted"
+            message="You do not have permission to view trip dashboard data. Please contact an administrator if this access is required."
+          />
+        </View>
+      ) : (
       <ScrollView
         showsVerticalScrollIndicator={false}
         style={container}
@@ -258,6 +276,7 @@ const DashBoard = () => {
           )}
         </View>
       </ScrollView>
+      )}
     </>
   );
 };

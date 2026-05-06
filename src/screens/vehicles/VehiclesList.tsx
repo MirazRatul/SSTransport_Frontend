@@ -11,6 +11,8 @@ import apiClient from '../../api/api';
 import { scale as s } from 'react-native-size-matters';
 import { useToast } from '../../components/Toast/ToastContext';
 import AppInput from '../../components/AppInput';
+import PermissionDeniedState from '../../components/PermissionDeniedState';
+import { isPermissionError } from '../../utils/permissionError';
 
 type Vehicle = {
   id: string;
@@ -31,6 +33,7 @@ const VehiclesList = () => {
   const [searchText, setSearchText] = useState('');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   // Fetch vehicles from API
   const fetchVehicles = useCallback(async () => {
@@ -38,8 +41,15 @@ const VehiclesList = () => {
       setLoading(true);
       const response = await apiClient.get('/vehicles');
       setVehicles(response.data);
-    } catch (error) {
+      setPermissionDenied(false);
+    } catch (error: any) {
       console.log('Error fetching vehicles:', error);
+      if (isPermissionError(error)) {
+        setPermissionDenied(true);
+        setVehicles([]);
+        return;
+      }
+
       showToast({ message: 'Failed to load vehicles', type: 'error' });
     } finally {
       setLoading(false);
@@ -101,6 +111,13 @@ const VehiclesList = () => {
     <>
       <AppHeader title="Vehicles" />
       <View style={container}>
+        {permissionDenied ? (
+          <PermissionDeniedState
+            title="Vehicles access restricted"
+            message="You do not have permission to view or manage vehicles. Please contact an administrator if this access is required."
+          />
+        ) : (
+          <>
         <View style={styles.searchRow}>
           <AppInput
             type="search"
@@ -140,6 +157,8 @@ const VehiclesList = () => {
             )}
             showsVerticalScrollIndicator={false}
           />
+        )}
+          </>
         )}
       </View>
     </>

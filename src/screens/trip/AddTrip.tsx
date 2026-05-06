@@ -21,6 +21,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { ChevronDown } from 'lucide-react-native';
 import apiClient from '../../api/api';
 import { useToast } from '../../components/Toast/ToastContext';
+import PermissionDeniedState from '../../components/PermissionDeniedState';
+import { isPermissionError } from '../../utils/permissionError';
 
 interface DropdownItem {
   id: string;
@@ -91,6 +93,7 @@ const AddTrip = () => {
   const [drivers, setDrivers] = useState<DropdownItem[]>([]);
   const [helpers, setHelpers] = useState<DropdownItem[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
 
 
@@ -153,6 +156,10 @@ const AddTrip = () => {
     const fetchData = async () => {
       try {
         setLoadingData(true);
+        if (!isEditMode) {
+          await apiClient.get('/trips');
+        }
+
         const vehiclesRes = await apiClient.get('/vehicles');
         const vehiclesData = vehiclesRes.data.map((vehicle: any) => ({
           id: vehicle.id.toString(),
@@ -188,8 +195,14 @@ const AddTrip = () => {
             }));
           setHelpers(helpersList);
         }
-      } catch (error) {
+        setPermissionDenied(false);
+      } catch (error: any) {
         console.log('Error fetching data:', error);
+        if (isPermissionError(error)) {
+          setPermissionDenied(true);
+          return;
+        }
+
         showToast({
           message: isEditMode
             ? 'Failed to load trip details'
@@ -224,8 +237,13 @@ const AddTrip = () => {
         setHelpers([{ id: crewData.helperId.toString(), name: crewData.helperName }]);
         
         showToast({ message: 'Driver and Helper auto-filled', type: 'success' });
-      } catch (error) {
+      } catch (error: any) {
         console.log('Error fetching crew:', error);
+        if (isPermissionError(error)) {
+          setPermissionDenied(true);
+          return;
+        }
+
         showToast({ message: 'Failed to load driver and helper', type: 'error' });
       }
     }
@@ -351,6 +369,11 @@ const AddTrip = () => {
     } catch (error: any) {
       console.log('Error saving trip:', error);
       console.log('Error response:', error?.response?.data);
+      if (isPermissionError(error)) {
+        setPermissionDenied(true);
+        return;
+      }
+
       showToast({
         message:
           error?.response?.data?.message ||
@@ -366,6 +389,18 @@ const AddTrip = () => {
     return (
       <SafeAreaView style={[container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={AppColors.secondaryColor} />
+      </SafeAreaView>
+    );
+  }
+
+  if (permissionDenied) {
+    return (
+      <SafeAreaView style={[container, { paddingBottom: s(10) }]}>
+        <CommonHeader title={isEditMode ? 'Edit Trip' : 'Add Trip'} />
+        <PermissionDeniedState
+          title="Trip access restricted"
+          message={`You do not have permission to ${isEditMode ? 'edit' : 'create'} trips. Please contact an administrator if this access is required.`}
+        />
       </SafeAreaView>
     );
   }

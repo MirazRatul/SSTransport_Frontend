@@ -20,6 +20,8 @@ import { useNavigation } from '@react-navigation/native';
 import AppButton from '../../components/AppButton';
 import apiClient from '../../api/api';
 import { useToast } from '../../components/Toast/ToastContext';
+import PermissionDeniedState from '../../components/PermissionDeniedState';
+import { isPermissionError } from '../../utils/permissionError';
 
 interface VehicleDetail {
   vehicleId: number;
@@ -82,6 +84,9 @@ const VehiclesDetails = ({ route }: any) => {
   );
   const [recentTrips, setRecentTrips] = useState<RecentTrip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [recentTripsPermissionDenied, setRecentTripsPermissionDenied] =
+    useState(false);
   const [selectedImage, setSelectedImage] = useState<{
     uri: string;
     title: string;
@@ -95,6 +100,7 @@ const VehiclesDetails = ({ route }: any) => {
           `/vehicles/details/${selectedVehicle.id}`,
         );
         setVehicleDetail(vehicleResponse.data);
+        setPermissionDenied(false);
 
         try {
           const tripsResponse = await apiClient.get(
@@ -105,12 +111,25 @@ const VehiclesDetails = ({ route }: any) => {
               ? tripsResponse.data
               : tripsResponse.data?.data || [],
           );
-        } catch (tripError) {
+          setRecentTripsPermissionDenied(false);
+        } catch (tripError: any) {
           console.log('Error fetching recent trips:', tripError);
+          if (isPermissionError(tripError)) {
+            setRecentTripsPermissionDenied(true);
+            setRecentTrips([]);
+            return;
+          }
+
           showToast({ message: 'Failed to load recent trips', type: 'error' });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.log('Error fetching vehicle details:', error);
+        if (isPermissionError(error)) {
+          setPermissionDenied(true);
+          setVehicleDetail(null);
+          return;
+        }
+
         showToast({ message: 'Failed to load vehicle details', type: 'error' });
       } finally {
         setLoading(false);
@@ -137,11 +156,18 @@ const VehiclesDetails = ({ route }: any) => {
     return (
       <SafeAreaView style={[container, { paddingBottom: s(10) }]}>
         <CommonHeader title="Vehicle Details" />
-        <View
-          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-        >
-          <AppText>Failed to load vehicle details</AppText>
-        </View>
+        {permissionDenied ? (
+          <PermissionDeniedState
+            title="Vehicle details restricted"
+            message="You do not have permission to view this vehicle. Please contact an administrator if this access is required."
+          />
+        ) : (
+          <View
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
+            <AppText>Failed to load vehicle details</AppText>
+          </View>
+        )}
       </SafeAreaView>
     );
   }
@@ -315,7 +341,11 @@ const VehiclesDetails = ({ route }: any) => {
           <AppText variant="bold" style={styles.summaryText}>
             Recent Trips Summary
           </AppText>
-          {recentTrips.length > 0 ? (
+          {recentTripsPermissionDenied ? (
+            <AppText style={styles.destinationText}>
+              You do not have permission to view recent trips for this vehicle.
+            </AppText>
+          ) : recentTrips.length > 0 ? (
             recentTrips.map((item, index) => (
               <View key={item.id}>
                 <TouchableOpacity

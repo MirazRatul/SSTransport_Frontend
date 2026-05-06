@@ -19,6 +19,8 @@ import { AppColors } from '../../styles/colors';
 import { scale as s } from 'react-native-size-matters';
 import apiClient from '../../api/api';
 import { useToast } from '../../components/Toast/ToastContext';
+import PermissionDeniedState from '../../components/PermissionDeniedState';
+import { isPermissionError } from '../../utils/permissionError';
 
 type Trip = {
   id?: string | number;
@@ -67,6 +69,7 @@ const TripList = () => {
   const [searchText, setSearchText] = useState('');
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
 
@@ -78,8 +81,15 @@ const TripList = () => {
         ? response.data
         : response.data?.data || [];
       setTrips(tripsData);
-    } catch (error) {
+      setPermissionDenied(false);
+    } catch (error: any) {
       console.log('Error fetching trips:', error);
+      if (isPermissionError(error)) {
+        setPermissionDenied(true);
+        setTrips([]);
+        return;
+      }
+
       showToast({ message: 'Failed to load trips', type: 'error' });
     } finally {
       setLoading(false);
@@ -175,6 +185,13 @@ const TripList = () => {
     <>
       <AppHeader title="Trips" />
       <SafeAreaView style={container} edges={['bottom']}>
+        {permissionDenied ? (
+          <PermissionDeniedState
+            title="Trips access restricted"
+            message="You do not have permission to view or manage trips. Please contact an administrator if this access is required."
+          />
+        ) : (
+          <>
         <Modal
           visible={!!tripToDelete}
           transparent
@@ -260,6 +277,8 @@ const TripList = () => {
             )
           }
         />
+          </>
+        )}
       </SafeAreaView>
     </>
   );

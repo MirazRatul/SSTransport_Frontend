@@ -2,7 +2,6 @@ import {
   ScrollView,
   StyleSheet,
   View,
-  Alert,
   TouchableOpacity,
   Modal,
   FlatList,
@@ -25,6 +24,8 @@ import { ChevronDown, X } from 'lucide-react-native';
 import apiClient from '../../api/api';
 import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from '@env';
 import { useToast } from '../../components/Toast/ToastContext';
+import PermissionDeniedState from '../../components/PermissionDeniedState';
+import { isPermissionError } from '../../utils/permissionError';
 
 interface DropdownItem {
   id: string;
@@ -62,6 +63,7 @@ const AddVehicle = () => {
   const [drivers, setDrivers] = useState<DropdownItem[]>([]);
   const [helpers, setHelpers] = useState<DropdownItem[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const vehicleSizeOptions = [
     { id: 'S', name: 'Small' },
@@ -74,6 +76,8 @@ const AddVehicle = () => {
     const fetchData = async () => {
       try {
         setLoadingData(true);
+        await apiClient.get('/vehicles');
+
         // Fetch all employees
         const employeesRes = await apiClient.get('/employees');
         const allEmployees = employeesRes.data;
@@ -95,8 +99,14 @@ const AddVehicle = () => {
             name: helper.name,
           }));
         setHelpers(helpersData);
-      } catch (error) {
+        setPermissionDenied(false);
+      } catch (error: any) {
         console.log('Error fetching data:', error);
+        if (isPermissionError(error)) {
+          setPermissionDenied(true);
+          return;
+        }
+
         showToast({ message: 'Failed to load drivers and helpers', type: 'error' });
       } finally {
         setLoadingData(false);
@@ -104,7 +114,7 @@ const AddVehicle = () => {
     };
 
     fetchData();
-  }, []);
+  }, [showToast]);
 
   const generateYears = () => {
     const years = [];
@@ -239,6 +249,11 @@ const AddVehicle = () => {
       navigation.goBack();
     } catch (error: any) {
       console.log('Error adding vehicle:', error);
+      if (isPermissionError(error)) {
+        setPermissionDenied(true);
+        return;
+      }
+
       showToast({
         message: error?.response?.data?.message || 'Failed to add vehicle',
         type: 'error',
@@ -252,6 +267,18 @@ const AddVehicle = () => {
     return (
       <SafeAreaView style={[container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={AppColors.secondaryColor} />
+      </SafeAreaView>
+    );
+  }
+
+  if (permissionDenied) {
+    return (
+      <SafeAreaView style={[container, { paddingBottom: s(10) }]}>
+        <CommonHeader title="Add Vehicle" />
+        <PermissionDeniedState
+          title="Vehicle access restricted"
+          message="You do not have permission to create vehicles. Please contact an administrator if this access is required."
+        />
       </SafeAreaView>
     );
   }

@@ -10,6 +10,8 @@ import TripDetailsCards from '../../components/trips/TripDetailsCards';
 import apiClient from '../../api/api';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useToast } from '../../components/Toast/ToastContext';
+import PermissionDeniedState from '../../components/PermissionDeniedState';
+import { isPermissionError } from '../../utils/permissionError';
 
 interface TripDetail {
   id: number | string;
@@ -106,6 +108,7 @@ const TripDetails = ({ route }: any) => {
   const tripId = selectedTripId || selectedTrip?.id?.toString();
   const [trip, setTrip] = useState<TripDetail | null>(selectedTrip || null);
   const [loading, setLoading] = useState(!selectedTrip);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -126,8 +129,15 @@ const TripDetails = ({ route }: any) => {
       setLoading(true);
       const response = await apiClient.get(`/trips/details/${tripId}`);
       setTrip(response.data);
-    } catch (error) {
+      setPermissionDenied(false);
+    } catch (error: any) {
       console.log('Error fetching trip details:', error);
+      if (isPermissionError(error)) {
+        setPermissionDenied(true);
+        setTrip(null);
+        return;
+      }
+
       showToast({ message: 'Failed to load trip details', type: 'error' });
     } finally {
       setLoading(false);
@@ -155,9 +165,16 @@ const TripDetails = ({ route }: any) => {
     return (
       <SafeAreaView style={container}>
         <CommonHeader title="Trip Details" />
-        <View style={styles.centerContent}>
-          <AppText>Failed to load trip details</AppText>
-        </View>
+        {permissionDenied ? (
+          <PermissionDeniedState
+            title="Trip details restricted"
+            message="You do not have permission to view this trip. Please contact an administrator if this access is required."
+          />
+        ) : (
+          <View style={styles.centerContent}>
+            <AppText>Failed to load trip details</AppText>
+          </View>
+        )}
       </SafeAreaView>
     );
   }
@@ -187,8 +204,15 @@ const TripDetails = ({ route }: any) => {
       setTrip(prev => prev ? { ...prev, status: newStatus } : null);
       showToast({ message: 'Trip status updated successfully!', type: 'success' });
       setShowStatusModal(false);
-    } catch (error) {
+    } catch (error: any) {
       console.log('Error updating trip status:', error);
+      if (isPermissionError(error)) {
+        setShowStatusModal(false);
+        setPermissionDenied(true);
+        setTrip(null);
+        return;
+      }
+
       showToast({ message: 'Failed to update trip status', type: 'error' });
     } finally {
       setUpdatingStatus(false);

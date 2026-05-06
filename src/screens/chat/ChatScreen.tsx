@@ -6,6 +6,7 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   PanResponder,
   Platform,
@@ -15,10 +16,7 @@ import {
   View,
 } from 'react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import { Send, User, X, Image as ImageIcon } from 'lucide-react-native';
@@ -51,6 +49,68 @@ type SwipeableMessageRowProps = {
   onReply: () => void;
   style?: any;
   children: React.ReactNode;
+};
+
+type MessageTextPart = {
+  text: string;
+  isUrl: boolean;
+};
+
+const URL_PATTERN = /((?:https?:\/\/|www\.)[^\s<]+|(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[^\s<]*)?)/gi;
+const TRAILING_URL_PUNCTUATION = /[.,!?;:]+$/;
+
+const normalizeUrl = (url: string) => {
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+
+  return `https://${url}`;
+};
+
+const splitMessageText = (text: string): MessageTextPart[] => {
+  const parts: MessageTextPart[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  URL_PATTERN.lastIndex = 0;
+
+  while ((match = URL_PATTERN.exec(text)) !== null) {
+    const matchedText = match[0];
+    const urlText = matchedText.replace(TRAILING_URL_PUNCTUATION, '');
+    const trailingText = matchedText.slice(urlText.length);
+
+    if (match.index > lastIndex) {
+      parts.push({
+        text: text.slice(lastIndex, match.index),
+        isUrl: false,
+      });
+    }
+
+    if (urlText) {
+      parts.push({
+        text: urlText,
+        isUrl: true,
+      });
+    }
+
+    if (trailingText) {
+      parts.push({
+        text: trailingText,
+        isUrl: false,
+      });
+    }
+
+    lastIndex = match.index + matchedText.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({
+      text: text.slice(lastIndex),
+      isUrl: false,
+    });
+  }
+
+  return parts.length > 0 ? parts : [{ text, isUrl: false }];
 };
 
 const SwipeableMessageRow = ({ isMine, onReply, style, children }: SwipeableMessageRowProps) => {
@@ -165,7 +225,6 @@ const formatMessageDate = (createdAt?: any) => {
 const ChatScreen = ({ route }: any) => {
   const { receiverId, receiverName, receiverImage, receiverRole } =
     route.params || {};
-  const insets = useSafeAreaInsets();
   const currentUser = auth().currentUser;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageText, setMessageText] = useState('');
@@ -177,7 +236,7 @@ const ChatScreen = ({ route }: any) => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null);
   const [isReceiverTyping, setIsReceiverTyping] = useState(false);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
 
   const conversationId = useMemo(() => {
@@ -414,6 +473,37 @@ const ChatScreen = ({ route }: any) => {
     setReplyingTo(message);
   };
 
+  const handleOpenLink = useCallback(async (url: string) => {
+    const normalizedUrl = normalizeUrl(url);
+
+    try {
+      await Linking.openURL(normalizedUrl);
+    } catch (error) {
+      console.log('Open link error:', error);
+      Alert.alert('Link Error', 'Unable to open this link.');
+    }
+  }, []);
+
+  const renderMessageText = useCallback(
+    (text: string) =>
+      splitMessageText(text).map((part, partIndex) => {
+        if (!part.isUrl) {
+          return part.text;
+        }
+
+        return (
+          <AppText
+            key={`${part.text}-${partIndex}`}
+            style={styles.messageLink}
+            onPress={() => handleOpenLink(part.text)}
+          >
+            {part.text}
+          </AppText>
+        );
+      }),
+    [handleOpenLink],
+  );
+
   // ─── Upload to Cloudinary ───────────────────────────────────────────────────
   const uploadToCloudinary = async (localUri: string, fileName: string): Promise<string> => {
     const filename = fileName || localUri.split('/').pop() || 'chat_image.jpg';
@@ -560,7 +650,7 @@ const ChatScreen = ({ route }: any) => {
                   isMine ? styles.myMessageText : styles.theirMessageText,
                 ]}
               >
-                  {item.text || (item.imageUrl ? '📷 Image' : '')}
+                  {renderMessageText(item.text)}
               </AppText>
             )}
 
@@ -967,6 +1057,10 @@ const styles = StyleSheet.create({
   },
   theirMessageText: {
     color: AppColors.textColor,
+  },
+  messageLink: {
+    color: '#1d4ed8',
+    textDecorationLine: 'underline',
   },
   timeText: {
     alignSelf: 'flex-end',

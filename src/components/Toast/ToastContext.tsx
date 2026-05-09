@@ -5,13 +5,28 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale as s, vs } from 'react-native-size-matters';
-import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react-native';
+import {
+  AlertTriangle,
+  CheckCircle,
+  Info,
+  MessageCircle,
+  User,
+  XCircle,
+} from 'lucide-react-native';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
+type ToastVariant = 'default' | 'chat';
 
 interface ToastConfig {
   title?: string;
@@ -19,6 +34,8 @@ interface ToastConfig {
   type?: ToastType;
   duration?: number; // ms
   onPress?: () => void;
+  variant?: ToastVariant;
+  avatarUrl?: string;
 }
 
 type ResolvedToastConfig = Required<Omit<ToastConfig, 'onPress'>> & {
@@ -64,6 +81,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
     message: '',
     type: 'info',
     duration: 3000,
+    variant: 'default',
+    avatarUrl: '',
     pressable: false,
   });
 
@@ -104,6 +123,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
       type = 'info',
       duration = 3000,
       onPress,
+      variant = 'default',
+      avatarUrl = '',
     }: ToastConfig) => {
       // cancel any in-flight timer
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -114,6 +135,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
         type,
         duration,
         onPress,
+        variant,
+        avatarUrl,
         pressable: Boolean(onPress),
       });
       setVisible(true);
@@ -142,6 +165,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const { bg, border } = TYPE_STYLES[config.type];
+  const isChatToast = config.variant === 'chat';
 
   return (
     <ToastContext.Provider value={{ showToast }}>
@@ -152,31 +176,68 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
             styles.toast,
             {
               top: insets.top + vs(10),
-              backgroundColor: bg,
-              borderLeftColor: border,
+              backgroundColor: isChatToast ? '#121826' : bg,
+              borderLeftColor: isChatToast ? '#38bdf8' : border,
               transform: [{ translateY }],
               opacity,
             },
+            isChatToast && styles.chatToast,
           ]}
         >
           <Pressable
             disabled={!config.pressable}
             onPress={() => dismissToast(config.onPress)}
-            style={styles.toastContent}
+            style={[
+              styles.toastContent,
+              isChatToast && styles.chatToastContent,
+            ]}
           >
-            <View style={styles.iconWrapper}>
-              {TYPE_ICONS[config.type](s(20))}
-            </View>
-            <View style={styles.textContainer}>
-              {config.title ? (
-                <Text style={styles.title} numberOfLines={1}>
-                  {config.title}
-                </Text>
-              ) : null}
-              <Text style={styles.message} numberOfLines={2}>
-                {config.message}
-              </Text>
-            </View>
+            {isChatToast ? (
+              <>
+                <View style={styles.avatarWrapper}>
+                  {config.avatarUrl ? (
+                    <Image
+                      source={{ uri: config.avatarUrl }}
+                      style={styles.avatar}
+                    />
+                  ) : (
+                    <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                      <User size={s(18)} color="#d7e0ea" />
+                    </View>
+                  )}
+                  <View style={styles.messageBadge}>
+                    <MessageCircle size={s(12)} color="#ffffff" />
+                  </View>
+                </View>
+                <View style={styles.textContainer}>
+                  <View style={styles.chatTitleRow}>
+                    <Text style={styles.chatTitle} numberOfLines={1}>
+                      {config.title || 'New message'}
+                    </Text>
+                    <Text style={styles.chatHint}>now</Text>
+                  </View>
+                  <Text style={styles.chatMessage} numberOfLines={2}>
+                    {config.message}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.iconWrapper}>
+                  {TYPE_ICONS[config.type](s(20))}
+                </View>
+                <View style={styles.textContainer}>
+                  {config.title ? (
+                    <Text style={styles.title} numberOfLines={1}>
+                      {config.title}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.message} numberOfLines={2}>
+                    {config.message}
+                  </Text>
+                </View>
+              </>
+            )}
           </Pressable>
         </Animated.View>
       )}
@@ -200,12 +261,24 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     overflow: 'hidden',
   },
+  chatToast: {
+    width: '92%',
+    borderLeftWidth: 0,
+    borderRadius: s(14),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
   toastContent: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: vs(12),
     paddingHorizontal: s(14),
     gap: s(10),
+  },
+  chatToastContent: {
+    paddingVertical: vs(10),
+    paddingHorizontal: s(12),
+    gap: s(12),
   },
   iconWrapper: {
     justifyContent: 'center',
@@ -224,5 +297,54 @@ const styles = StyleSheet.create({
     fontSize: s(13),
     color: '#fff',
     lineHeight: vs(18),
+  },
+  avatarWrapper: {
+    position: 'relative',
+    width: s(44),
+    height: s(44),
+  },
+  avatar: {
+    width: s(44),
+    height: s(44),
+    borderRadius: s(22),
+  },
+  avatarPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#273244',
+  },
+  messageBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: s(20),
+    height: s(20),
+    borderRadius: s(10),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0ea5e9',
+    borderWidth: 2,
+    borderColor: '#121826',
+  },
+  chatTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: s(8),
+  },
+  chatTitle: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: s(14),
+    fontWeight: '700',
+  },
+  chatHint: {
+    color: '#8ea0b5',
+    fontSize: s(11),
+  },
+  chatMessage: {
+    color: '#cbd5e1',
+    fontSize: s(13),
+    lineHeight: vs(18),
+    marginTop: vs(2),
   },
 });

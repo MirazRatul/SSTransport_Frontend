@@ -151,11 +151,17 @@ const MainStack = () => {
             (typeof remoteMessage.data.text === 'string'
               ? remoteMessage.data.text
               : 'Open chat');
+          const senderImage =
+            typeof remoteMessage.data.senderImage === 'string'
+              ? remoteMessage.data.senderImage
+              : '';
 
           showToast({
             title: senderName,
             message: messageBody,
             type: 'info',
+            variant: 'chat',
+            avatarUrl: senderImage,
             duration: 4500,
             onPress: () => openChatFromNotificationData(remoteMessage.data),
           });

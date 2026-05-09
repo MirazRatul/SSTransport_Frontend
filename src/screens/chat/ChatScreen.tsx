@@ -553,26 +553,39 @@ const ChatScreen = ({ route }: any) => {
   );
 
   const handleSelectReaction = useCallback(
-    async (messageId: string, reaction: string | null) => {
+    async (message: ChatMessage, reaction: string | null) => {
       if (!conversationRef || !currentUser?.uid) return;
 
       try {
         await conversationRef.set(
           {
             messageReactions: {
-              [messageId]: {
+              [message.id]: {
                 [currentUser.uid]: reaction,
               },
             },
           },
           { merge: true },
         );
+
+        if (
+          reaction &&
+          conversationId &&
+          message.senderId !== currentUser.uid
+        ) {
+          void notifyChatMessage({
+            receiverId: message.senderId,
+            conversationId,
+            messageId: message.id,
+            text: `Reacted ${reaction} to your message`,
+          });
+        }
       } catch (error) {
         console.log('Reaction error:', error);
         Alert.alert('Reaction Error', 'Unable to update your reaction.');
       }
     },
-    [conversationRef, currentUser?.uid],
+    [conversationId, conversationRef, currentUser?.uid],
   );
 
   // ─── Upload to Cloudinary ───────────────────────────────────────────────────
@@ -704,9 +717,7 @@ const ChatScreen = ({ route }: any) => {
               ...(messageReactions[item.id] || {}),
               ...(item.reactions || {}),
             }}
-            onSelectReaction={reaction =>
-              handleSelectReaction(item.id, reaction)
-            }
+            onSelectReaction={reaction => handleSelectReaction(item, reaction)}
           >
             <View
               style={[

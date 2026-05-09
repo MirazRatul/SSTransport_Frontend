@@ -1,6 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { Alert, AppState, AppStateStatus } from 'react-native';
 import AuthStack from './AuthStack';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
@@ -14,6 +14,14 @@ import TripDetails from '../screens/trip/TripDetails';
 import AddVehicle from '../screens/vehicles/AddVehicle';
 import AddTrip from '../screens/trip/AddTrip';
 import ChatScreen from '../screens/chat/ChatScreen';
+import {
+  handleInitialNotification,
+  registerForPushNotifications,
+  subscribeToNotificationOpenEvents,
+  subscribeToFcmTokenRefresh,
+  subscribeToForegroundMessages,
+} from '../services/pushNotifications';
+import { openChatFromNotificationData } from './RootNavigation';
 
 const Stack = createNativeStackNavigator();
 
@@ -26,33 +34,45 @@ const MainStack = () => {
   useEffect(() => {
     if (!user?.uid) return;
 
-    const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+    const appStateSubscription = AppState.addEventListener(
+      'change',
+      handleAppStateChange,
+    );
 
     async function handleAppStateChange(state: AppStateStatus) {
       const presenceRef = firestore().collection('presence').doc(user.uid);
-      
+
       if (state === 'background' || state === 'inactive') {
         // App is backgrounded or closed
-        console.log('📱 App backgrounded/closed. Setting user offline:', user.uid);
-        presenceRef.set(
-          {
-            online: false,
-            lastSeen: new Date(),
-          },
-          { merge: true }
-        )
-          .catch(error => console.log('❌ Error setting offline:', error.message));
+        console.log(
+          '📱 App backgrounded/closed. Setting user offline:',
+          user.uid,
+        );
+        presenceRef
+          .set(
+            {
+              online: false,
+              lastSeen: new Date(),
+            },
+            { merge: true },
+          )
+          .catch(error =>
+            console.log('❌ Error setting offline:', error.message),
+          );
       } else if (state === 'active') {
         // App came back to foreground
         console.log('📱 App active. Setting user online:', user.uid);
-        presenceRef.set(
-          {
-            online: true,
-            lastSeen: new Date(),
-          },
-          { merge: true }
-        )
-          .catch(error => console.log('❌ Error setting online:', error.message));
+        presenceRef
+          .set(
+            {
+              online: true,
+              lastSeen: new Date(),
+            },
+            { merge: true },
+          )
+          .catch(error =>
+            console.log('❌ Error setting online:', error.message),
+          );
       }
     }
 
@@ -72,13 +92,14 @@ const MainStack = () => {
 
     // Set user online
     console.log('Setting user online:', user.uid);
-    presenceRef.set(
-      {
-        online: true,
-        lastSeen: new Date(),
-      },
-      { merge: true }
-    )
+    presenceRef
+      .set(
+        {
+          online: true,
+          lastSeen: new Date(),
+        },
+        { merge: true },
+      )
       .then(() => {
         console.log('✅ Online status set successfully for', user.uid);
         // Verify it was written
@@ -91,14 +112,64 @@ const MainStack = () => {
     // Clean up: set offline when unmounting or user logs out
     return () => {
       console.log('Setting user offline:', user.uid);
-      presenceRef.set(
-        {
-          online: false,
-          lastSeen: new Date(),
-        },
-        { merge: true }
-      )
+      presenceRef
+        .set(
+          {
+            online: false,
+            lastSeen: new Date(),
+          },
+          { merge: true },
+        )
         .catch(error => console.log('❌ Error setting offline status:', error));
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    registerForPushNotifications();
+
+    const unsubscribeTokenRefresh = subscribeToFcmTokenRefresh();
+    const unsubscribeForegroundMessages = subscribeToForegroundMessages(
+      remoteMessage => {
+        if (remoteMessage.data?.type === 'chat') {
+          const senderName =
+            typeof remoteMessage.data.senderName === 'string'
+              ? remoteMessage.data.senderName
+              : 'New message';
+          const messageBody =
+            remoteMessage.notification?.body ||
+            (typeof remoteMessage.data.text === 'string'
+              ? remoteMessage.data.text
+              : 'Open chat');
+
+          Alert.alert(senderName, messageBody, [
+            { text: 'Later', style: 'cancel' },
+            {
+              text: 'Open',
+              onPress: () => openChatFromNotificationData(remoteMessage.data),
+            },
+          ]);
+          return;
+        }
+
+        console.log('Foreground push notification:', remoteMessage.messageId);
+      },
+    );
+    const unsubscribeNotificationOpen = subscribeToNotificationOpenEvents(
+      remoteMessage => {
+        openChatFromNotificationData(remoteMessage.data);
+      },
+    );
+
+    handleInitialNotification(remoteMessage => {
+      openChatFromNotificationData(remoteMessage.data);
+    });
+
+    return () => {
+      unsubscribeTokenRefresh();
+      unsubscribeForegroundMessages();
+      unsubscribeNotificationOpen();
     };
   }, [user?.uid]);
 
@@ -145,20 +216,18 @@ const MainStack = () => {
   }, [initializing, isFirstLaunch]);
 
   if (initializing || isFirstLaunch === null) {
-    return null; 
+    return null;
   } // keep splash visible
 
   return (
-    <Stack.Navigator
-      screenOptions={{ headerShown: false }}
-    >
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
       {isFirstLaunch ? (
         <Stack.Screen name="onboarding">
           {props => (
-            <OnboardingScreen 
-              {...props} 
+            <OnboardingScreen
+              {...props}
               //function to update state when done
-              onFinish={() => setIsFirstLaunch(false)} 
+              onFinish={() => setIsFirstLaunch(false)}
             />
           )}
         </Stack.Screen>
@@ -166,11 +235,11 @@ const MainStack = () => {
         <>
           <Stack.Screen name="DrawerTab" component={DrawerStack} />
           <Stack.Screen name="EmployeeDetails" component={EmployeeDetails} />
-          <Stack.Screen name="VehicleDetails" component={VehiclesDetails}/>
-          <Stack.Screen name="AddVehicle" component={AddVehicle}/>
-          <Stack.Screen name="AddTrip" component={AddTrip}/>
-          <Stack.Screen name="TripDetails" component={TripDetails}/>
-          <Stack.Screen name="ChatScreen" component={ChatScreen}/>
+          <Stack.Screen name="VehicleDetails" component={VehiclesDetails} />
+          <Stack.Screen name="AddVehicle" component={AddVehicle} />
+          <Stack.Screen name="AddTrip" component={AddTrip} />
+          <Stack.Screen name="TripDetails" component={TripDetails} />
+          <Stack.Screen name="ChatScreen" component={ChatScreen} />
         </>
       ) : (
         <Stack.Screen name="AuthStack" component={AuthStack} />

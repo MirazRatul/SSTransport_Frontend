@@ -15,7 +15,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
@@ -30,6 +36,7 @@ import MessageReaction, {
 } from '../../components/chat/MessageReaction';
 import { container } from '../../constants/container';
 import { AppColors } from '../../styles/colors';
+import { notifyChatMessage } from '../../services/pushNotifications';
 
 interface ChatMessage {
   id: string;
@@ -60,7 +67,8 @@ type MessageTextPart = {
   isUrl: boolean;
 };
 
-const URL_PATTERN = /((?:https?:\/\/|www\.)[^\s<]+|(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[^\s<]*)?)/gi;
+const URL_PATTERN =
+  /((?:https?:\/\/|www\.)[^\s<]+|(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[^\s<]*)?)/gi;
 const TRAILING_URL_PUNCTUATION = /[.,!?;:]+$/;
 
 const normalizeUrl = (url: string) => {
@@ -117,7 +125,12 @@ const splitMessageText = (text: string): MessageTextPart[] => {
   return parts.length > 0 ? parts : [{ text, isUrl: false }];
 };
 
-const SwipeableMessageRow = ({ isMine, onReply, style, children }: SwipeableMessageRowProps) => {
+const SwipeableMessageRow = ({
+  isMine,
+  onReply,
+  style,
+  children,
+}: SwipeableMessageRowProps) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const dragLimit = s(64);
 
@@ -210,10 +223,16 @@ const formatMessageDate = (createdAt?: any) => {
     return 'Yesterday';
   }
 
-  const dayDifference = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  const dayDifference = Math.floor(
+    (today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
+  );
 
   if (dayDifference < 7) {
-    return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+    return date.toLocaleDateString([], {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+    });
   }
 
   // Check if same year
@@ -222,7 +241,11 @@ const formatMessageDate = (createdAt?: any) => {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   } else {
     // Different year: show "Apr 19, 2025"
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString([], {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   }
 };
 
@@ -355,12 +378,12 @@ const ChatScreen = ({ route }: any) => {
 
         // ─── Listen to receiver's seen timestamp ──────────────────────────
         unsubscribeConversation = conversationRef.onSnapshot(snapshot => {
-        const data = snapshot.data();
-        const ts = data?.seenBy?.[receiverId];
-        setReceiverLastSeen(ts?.toDate?.()?.getTime?.() ?? null);
-        setIsReceiverTyping(Boolean(data?.typingBy?.[receiverId]));
-        setMessageReactions(data?.messageReactions || {});
-      });
+          const data = snapshot.data();
+          const ts = data?.seenBy?.[receiverId];
+          setReceiverLastSeen(ts?.toDate?.()?.getTime?.() ?? null);
+          setIsReceiverTyping(Boolean(data?.typingBy?.[receiverId]));
+          setMessageReactions(data?.messageReactions || {});
+        });
       })
       .catch(error => {
         console.log('Conversation setup error:', error);
@@ -372,7 +395,13 @@ const ChatScreen = ({ route }: any) => {
       unsubscribeMessages?.();
       unsubscribeConversation?.();
     };
-  }, [conversationRef, currentUser?.uid, ensureConversation, markAsSeen, receiverId]);
+  }, [
+    conversationRef,
+    currentUser?.uid,
+    ensureConversation,
+    markAsSeen,
+    receiverId,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -446,9 +475,12 @@ const ChatScreen = ({ route }: any) => {
       if (replyingTo) {
         messageData.replyTo = {
           messageId: replyingTo.id,
-            text: replyingTo.text || (replyingTo.imageUrl ? '📷 Image' : ''),
-            imageUrl: replyingTo.imageUrl || null,
-          senderName: replyingTo.senderId === currentUser.uid ? 'You' : (receiverName || 'Admin'),
+          text: replyingTo.text || (replyingTo.imageUrl ? '📷 Image' : ''),
+          imageUrl: replyingTo.imageUrl || null,
+          senderName:
+            replyingTo.senderId === currentUser.uid
+              ? 'You'
+              : receiverName || 'Admin',
           senderId: replyingTo.senderId,
         };
       }
@@ -467,6 +499,14 @@ const ChatScreen = ({ route }: any) => {
       );
 
       await batch.commit();
+      if (conversationId) {
+        void notifyChatMessage({
+          receiverId,
+          conversationId,
+          messageId: messageRef.id,
+          text: imageUrl ? 'Image' : trimmedMessage,
+        });
+      }
       setReplyingTo(null);
     } catch (error) {
       console.log('Send message error:', error);
@@ -536,7 +576,10 @@ const ChatScreen = ({ route }: any) => {
   );
 
   // ─── Upload to Cloudinary ───────────────────────────────────────────────────
-  const uploadToCloudinary = async (localUri: string, fileName: string): Promise<string> => {
+  const uploadToCloudinary = async (
+    localUri: string,
+    fileName: string,
+  ): Promise<string> => {
     const filename = fileName || localUri.split('/').pop() || 'chat_image.jpg';
     const ext = filename.split('.').pop()?.toLowerCase() || 'jpg';
     const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
@@ -555,7 +598,8 @@ const ChatScreen = ({ route }: any) => {
       { method: 'POST', body: formData },
     );
     const json = await response.json();
-    if (!json.secure_url) throw new Error(json.error?.message || 'Cloudinary upload failed');
+    if (!json.secure_url)
+      throw new Error(json.error?.message || 'Cloudinary upload failed');
     return json.secure_url;
   };
 
@@ -591,8 +635,11 @@ const ChatScreen = ({ route }: any) => {
 
     try {
       setUploadingImage(true);
-      const imageUrl = await uploadToCloudinary(selectedImageUri, 'chat_image.jpg');
-      
+      const imageUrl = await uploadToCloudinary(
+        selectedImageUri,
+        'chat_image.jpg',
+      );
+
       // Send as message with image
       await handleSend(imageUrl);
       setSelectedImageUri(null);
@@ -604,7 +651,13 @@ const ChatScreen = ({ route }: any) => {
     }
   };
 
-  const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
+  const renderMessage = ({
+    item,
+    index,
+  }: {
+    item: ChatMessage;
+    index: number;
+  }) => {
     const currentUserId = currentUser?.uid;
     if (!currentUserId) return null;
 
@@ -628,20 +681,22 @@ const ChatScreen = ({ route }: any) => {
             isMine ? styles.myMessageRow : styles.theirMessageRow,
           ]}
         >
-          {!isMine && (
-            receiverImage ? (
+          {!isMine &&
+            (receiverImage ? (
               <Image
                 source={{ uri: receiverImage }}
                 style={styles.receiverAvatar}
               />
             ) : (
               <View
-                style={[styles.receiverAvatar, styles.receiverAvatarPlaceholder]}
+                style={[
+                  styles.receiverAvatar,
+                  styles.receiverAvatarPlaceholder,
+                ]}
               >
                 <User size={s(12)} color={AppColors.textColor} />
               </View>
-            )
-          )}
+            ))}
           <MessageReaction
             currentUserId={currentUserId}
             isMine={isMine}
@@ -649,7 +704,9 @@ const ChatScreen = ({ route }: any) => {
               ...(messageReactions[item.id] || {}),
               ...(item.reactions || {}),
             }}
-            onSelectReaction={reaction => handleSelectReaction(item.id, reaction)}
+            onSelectReaction={reaction =>
+              handleSelectReaction(item.id, reaction)
+            }
           >
             <View
               style={[
@@ -666,22 +723,29 @@ const ChatScreen = ({ route }: any) => {
               />
               {/* ─── Show quoted message if this is a reply ──────────────────────── */}
               {item.replyTo && (
-                <View style={[styles.quotedMessage, isMine ? styles.quotedMessageMine : styles.quotedMessageTheir]}>
+                <View
+                  style={[
+                    styles.quotedMessage,
+                    isMine
+                      ? styles.quotedMessageMine
+                      : styles.quotedMessageTheir,
+                  ]}
+                >
                   <AppText style={styles.quotedSenderName}>
                     {item.replyTo.senderName}
                   </AppText>
-                  <AppText
-                    style={styles.quotedText}
-                    numberOfLines={2}
-                  >
-                      {item.replyTo.text || (item.replyTo.imageUrl ? '📷 Image' : '')}
+                  <AppText style={styles.quotedText} numberOfLines={2}>
+                    {item.replyTo.text ||
+                      (item.replyTo.imageUrl ? '📷 Image' : '')}
                   </AppText>
                 </View>
               )}
 
               {/* ─── Display Image ──────────────────────────────────────────────── */}
               {item.imageUrl && (
-                <TouchableOpacity onPress={() => setViewingImageUrl(item.imageUrl || '')}>
+                <TouchableOpacity
+                  onPress={() => setViewingImageUrl(item.imageUrl || '')}
+                >
                   <Image
                     source={{ uri: item.imageUrl }}
                     style={styles.messageImage}
@@ -697,7 +761,7 @@ const ChatScreen = ({ route }: any) => {
                     isMine ? styles.myMessageText : styles.theirMessageText,
                   ]}
                 >
-                    {renderMessageText(item.text)}
+                  {renderMessageText(item.text)}
                 </AppText>
               )}
 
@@ -866,7 +930,8 @@ const ChatScreen = ({ route }: any) => {
             styles.inputContainer,
             {
               paddingBottom: vs(6),
-              marginBottom: Platform.OS === 'android' ? androidKeyboardHeight : 0,
+              marginBottom:
+                Platform.OS === 'android' ? androidKeyboardHeight : 0,
             },
           ]}
         >
@@ -904,7 +969,10 @@ const ChatScreen = ({ route }: any) => {
               disabled={uploadingImage}
             >
               {uploadingImage ? (
-                <ActivityIndicator size="small" color={AppColors.primaryColor} />
+                <ActivityIndicator
+                  size="small"
+                  color={AppColors.primaryColor}
+                />
               ) : (
                 <Send size={s(18)} color={AppColors.primaryColor} />
               )}
@@ -919,7 +987,10 @@ const ChatScreen = ({ route }: any) => {
               disabled={!messageText.trim() || sending}
             >
               {sending ? (
-                <ActivityIndicator size="small" color={AppColors.primaryColor} />
+                <ActivityIndicator
+                  size="small"
+                  color={AppColors.primaryColor}
+                />
               ) : (
                 <Send size={s(18)} color={AppColors.primaryColor} />
               )}

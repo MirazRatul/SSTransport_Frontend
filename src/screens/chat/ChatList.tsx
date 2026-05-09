@@ -161,7 +161,10 @@ const ChatList = () => {
       return;
     }
 
-    console.log('Setting up presence listeners for admins:', admins.map(a => a.id));
+    console.log(
+      'Setting up presence listeners for admins:',
+      admins.map(a => a.id),
+    );
 
     const unsubscribes = admins.map(admin => {
       console.log('Listening to presence for admin:', admin.id);
@@ -183,7 +186,7 @@ const ChatList = () => {
               ...prev,
               [admin.id]: false,
             }));
-          }
+          },
         );
     });
 
@@ -256,7 +259,12 @@ const ChatList = () => {
               <User size={s(22)} color={AppColors.textColor} />
             </View>
           )}
-          <View style={[styles.statusDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
+          <View
+            style={[
+              styles.statusDot,
+              isOnline ? styles.onlineDot : styles.offlineDot,
+            ]}
+          />
         </View>
 
         <View style={styles.chatInfo}>
@@ -337,6 +345,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingTop: vs(0),
     paddingBottom: vs(18),
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: s(24),
+  },
+  emptyText: {
+    color: '#8f9299',
+    fontSize: s(14),
+    marginTop: vs(10),
+    textAlign: 'center',
   },
   chatRow: {
     flexDirection: 'row',

@@ -1,6 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { Alert, AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import AuthStack from './AuthStack';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
@@ -21,7 +21,11 @@ import {
   subscribeToFcmTokenRefresh,
   subscribeToForegroundMessages,
 } from '../services/pushNotifications';
-import { openChatFromNotificationData } from './RootNavigation';
+import {
+  openChatFromNotificationData,
+  shouldSuppressForegroundChatNotification,
+} from './RootNavigation';
+import { useToast } from '../components/Toast/ToastContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +33,7 @@ const MainStack = () => {
   const [user, setUser] = useState<any>(null);
   const [initializing, setInitializing] = useState(true);
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
+  const { showToast } = useToast();
 
   // ─── Listen to app state (foreground/background) ────────────────────────
   useEffect(() => {
@@ -133,6 +138,10 @@ const MainStack = () => {
     const unsubscribeForegroundMessages = subscribeToForegroundMessages(
       remoteMessage => {
         if (remoteMessage.data?.type === 'chat') {
+          if (shouldSuppressForegroundChatNotification(remoteMessage.data)) {
+            return;
+          }
+
           const senderName =
             typeof remoteMessage.data.senderName === 'string'
               ? remoteMessage.data.senderName
@@ -143,13 +152,13 @@ const MainStack = () => {
               ? remoteMessage.data.text
               : 'Open chat');
 
-          Alert.alert(senderName, messageBody, [
-            { text: 'Later', style: 'cancel' },
-            {
-              text: 'Open',
-              onPress: () => openChatFromNotificationData(remoteMessage.data),
-            },
-          ]);
+          showToast({
+            title: senderName,
+            message: messageBody,
+            type: 'info',
+            duration: 4500,
+            onPress: () => openChatFromNotificationData(remoteMessage.data),
+          });
           return;
         }
 
@@ -171,7 +180,7 @@ const MainStack = () => {
       unsubscribeForegroundMessages();
       unsubscribeNotificationOpen();
     };
-  }, [user?.uid]);
+  }, [showToast, user?.uid]);
 
   useEffect(() => {
     const checkOnboarding = async () => {

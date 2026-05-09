@@ -59,6 +59,28 @@ export const openChatFromNotificationData = (
   return true;
 };
 
+export const shouldSuppressForegroundChatNotification = (
+  data?: Record<string, unknown>,
+) => {
+  const chatParams = getChatParamsFromNotificationData(data);
+  const currentRoute = navigationRef.isReady()
+    ? navigationRef.getCurrentRoute()
+    : null;
+  const currentParams = currentRoute?.params as
+    | Partial<ChatRouteParams>
+    | undefined;
+
+  if (currentRoute?.name === 'MyChat') {
+    return true;
+  }
+
+  return (
+    currentRoute?.name === 'ChatScreen' &&
+    Boolean(chatParams?.receiverId) &&
+    currentParams?.receiverId === chatParams?.receiverId
+  );
+};
+
 export const flushPendingNotificationNavigation = () => {
   if (!pendingChatParams || !navigationRef.isReady()) return;
 
